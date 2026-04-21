@@ -1,6 +1,7 @@
 import { createHmac } from 'crypto';
 
-const BASE_URL = 'https://api.jurnal.id';
+const BASE_URL = 'https://api.mekari.com';
+const BASE_PATH = '/public/jurnal';
 
 function getCredentials(): { clientId: string; clientSecret: string } {
   const clientId = process.env.JURNAL_CLIENT_ID;
@@ -29,12 +30,12 @@ export async function jurnalRequest<T = unknown>(
   params?: Record<string, string | number | boolean>,
   body?: unknown
 ): Promise<T> {
-  let fullPath = path;
+  let fullPath = `${BASE_PATH}${path}`;
   if (params && Object.keys(params).length > 0) {
     const qs = new URLSearchParams(
       Object.fromEntries(Object.entries(params).map(([k, v]) => [k, String(v)]))
     ).toString();
-    fullPath = `${path}?${qs}`;
+    fullPath = `${fullPath}?${qs}`;
   }
 
   const headers = buildAuthHeaders(method, fullPath);
