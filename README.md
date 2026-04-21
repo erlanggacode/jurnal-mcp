@@ -61,13 +61,17 @@ npm start
 
 ## Connecting to Claude.ai or n8n
 
-- **MCP server URL**: `http://your-host:3000`
-- **Transport**: SSE
-- **SSE endpoint**: `http://your-host:3000/sse`
+- **MCP server URL**: `http://your-host:3000/mcp`
+- **Transport**: Streamable HTTP
 - **No authentication required** at the MCP level (Jurnal auth is handled internally)
 
 The server binds to `0.0.0.0:3000` and is accessible from any machine on the same network.
 To find your server's IP: `hostname -I`
+
+To add to Claude Code:
+```bash
+claude mcp add jurnal-mcp --transport http http://your-host:3000/mcp
+```
 
 ## Available Tools
 

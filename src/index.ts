@@ -1,9 +1,11 @@
 import { createServer, IncomingMessage, ServerResponse } from 'http';
+import { randomUUID } from 'crypto';
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
-import { SSEServerTransport } from '@modelcontextprotocol/sdk/server/sse.js';
+import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import {
   CallToolRequestSchema,
   ListToolsRequestSchema,
+  isInitializeRequest,
 } from '@modelcontextprotocol/sdk/types.js';
 import { z } from 'zod';
 
@@ -93,122 +95,135 @@ function zodToJsonSchema(schema: z.ZodObject<z.ZodRawShape>): Record<string, unk
   };
 }
 
-const server = new Server(
-  { name: 'jurnal-mcp', version: '1.0.0' },
-  { capabilities: { tools: {} } }
-);
+function createMcpServer(): Server {
+  const server = new Server(
+    { name: 'jurnal-mcp', version: '1.0.0' },
+    { capabilities: { tools: {} } }
+  );
 
-server.setRequestHandler(ListToolsRequestSchema, async () => ({
-  tools: [
-    {
-      name: 'list_sales_orders',
-      description: 'List sales orders from Jurnal.id with optional filtering by status',
-      inputSchema: zodToJsonSchema(listSalesOrdersSchema),
-    },
-    {
-      name: 'get_sales_order',
-      description: 'Get full details of a specific sales order including line items',
-      inputSchema: zodToJsonSchema(getSalesOrderSchema),
-    },
-    {
-      name: 'close_sales_order',
-      description: 'Close an open sales order',
-      inputSchema: zodToJsonSchema(closeSalesOrderSchema),
-    },
-    {
-      name: 'create_sales_order',
-      description: 'Create a new sales order with line items',
-      inputSchema: zodToJsonSchema(createSalesOrderSchema),
-    },
-    {
-      name: 'create_delivery_order',
-      description: 'Create a delivery order from a sales order',
-      inputSchema: zodToJsonSchema(createDeliveryOrderSchema),
-    },
-    {
-      name: 'list_sales_invoices',
-      description: 'List sales invoices from Jurnal.id',
-      inputSchema: zodToJsonSchema(listSalesInvoicesSchema),
-    },
-    {
-      name: 'list_receive_payments',
-      description: 'List received payments from Jurnal.id',
-      inputSchema: zodToJsonSchema(listReceivePaymentsSchema),
-    },
-    {
-      name: 'get_receive_payments_by_invoice',
-      description: 'Get all payments for a specific invoice with total paid amount',
-      inputSchema: zodToJsonSchema(getReceivePaymentsByInvoiceSchema),
-    },
-    {
-      name: 'create_receive_payment',
-      description: 'Record a new payment received against an invoice',
-      inputSchema: zodToJsonSchema(createReceivePaymentSchema),
-    },
-  ],
-}));
+  server.setRequestHandler(ListToolsRequestSchema, async () => ({
+    tools: [
+      {
+        name: 'list_sales_orders',
+        description: 'List sales orders from Jurnal.id with optional filtering by status',
+        inputSchema: zodToJsonSchema(listSalesOrdersSchema),
+      },
+      {
+        name: 'get_sales_order',
+        description: 'Get full details of a specific sales order including line items',
+        inputSchema: zodToJsonSchema(getSalesOrderSchema),
+      },
+      {
+        name: 'close_sales_order',
+        description: 'Close an open sales order',
+        inputSchema: zodToJsonSchema(closeSalesOrderSchema),
+      },
+      {
+        name: 'create_sales_order',
+        description: 'Create a new sales order with line items',
+        inputSchema: zodToJsonSchema(createSalesOrderSchema),
+      },
+      {
+        name: 'create_delivery_order',
+        description: 'Create a delivery order from a sales order',
+        inputSchema: zodToJsonSchema(createDeliveryOrderSchema),
+      },
+      {
+        name: 'list_sales_invoices',
+        description: 'List sales invoices from Jurnal.id',
+        inputSchema: zodToJsonSchema(listSalesInvoicesSchema),
+      },
+      {
+        name: 'list_receive_payments',
+        description: 'List received payments from Jurnal.id',
+        inputSchema: zodToJsonSchema(listReceivePaymentsSchema),
+      },
+      {
+        name: 'get_receive_payments_by_invoice',
+        description: 'Get all payments for a specific invoice with total paid amount',
+        inputSchema: zodToJsonSchema(getReceivePaymentsByInvoiceSchema),
+      },
+      {
+        name: 'create_receive_payment',
+        description: 'Record a new payment received against an invoice',
+        inputSchema: zodToJsonSchema(createReceivePaymentSchema),
+      },
+    ],
+  }));
 
-server.setRequestHandler(CallToolRequestSchema, async (request) => {
-  const { name, arguments: args } = request.params;
+  server.setRequestHandler(CallToolRequestSchema, async (request) => {
+    const { name, arguments: args } = request.params;
 
-  try {
-    let result: unknown;
+    try {
+      let result: unknown;
 
-    switch (name) {
-      case 'list_sales_orders':
-        result = await listSalesOrders(listSalesOrdersSchema.parse(args));
-        break;
-      case 'get_sales_order':
-        result = await getSalesOrder(getSalesOrderSchema.parse(args));
-        break;
-      case 'close_sales_order':
-        result = await closeSalesOrder(closeSalesOrderSchema.parse(args));
-        break;
-      case 'create_sales_order':
-        result = await createSalesOrder(createSalesOrderSchema.parse(args));
-        break;
-      case 'create_delivery_order':
-        result = await createDeliveryOrder(createDeliveryOrderSchema.parse(args));
-        break;
-      case 'list_sales_invoices':
-        result = await listSalesInvoices(listSalesInvoicesSchema.parse(args));
-        break;
-      case 'list_receive_payments':
-        result = await listReceivePayments(listReceivePaymentsSchema.parse(args));
-        break;
-      case 'get_receive_payments_by_invoice':
-        result = await getReceivePaymentsByInvoice(getReceivePaymentsByInvoiceSchema.parse(args));
-        break;
-      case 'create_receive_payment':
-        result = await createReceivePayment(createReceivePaymentSchema.parse(args));
-        break;
-      default:
-        return {
-          content: [{ type: 'text', text: `Unknown tool: ${name}` }],
-          isError: true,
-        };
+      switch (name) {
+        case 'list_sales_orders':
+          result = await listSalesOrders(listSalesOrdersSchema.parse(args));
+          break;
+        case 'get_sales_order':
+          result = await getSalesOrder(getSalesOrderSchema.parse(args));
+          break;
+        case 'close_sales_order':
+          result = await closeSalesOrder(closeSalesOrderSchema.parse(args));
+          break;
+        case 'create_sales_order':
+          result = await createSalesOrder(createSalesOrderSchema.parse(args));
+          break;
+        case 'create_delivery_order':
+          result = await createDeliveryOrder(createDeliveryOrderSchema.parse(args));
+          break;
+        case 'list_sales_invoices':
+          result = await listSalesInvoices(listSalesInvoicesSchema.parse(args));
+          break;
+        case 'list_receive_payments':
+          result = await listReceivePayments(listReceivePaymentsSchema.parse(args));
+          break;
+        case 'get_receive_payments_by_invoice':
+          result = await getReceivePaymentsByInvoice(getReceivePaymentsByInvoiceSchema.parse(args));
+          break;
+        case 'create_receive_payment':
+          result = await createReceivePayment(createReceivePaymentSchema.parse(args));
+          break;
+        default:
+          return {
+            content: [{ type: 'text', text: `Unknown tool: ${name}` }],
+            isError: true,
+          };
+      }
+
+      return {
+        content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
+      };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      return {
+        content: [{ type: 'text', text: `Error: ${message}` }],
+        isError: true,
+      };
     }
+  });
 
-    return {
-      content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
-    };
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    return {
-      content: [{ type: 'text', text: `Error: ${message}` }],
-      isError: true,
-    };
-  }
-});
+  return server;
+}
 
-const transports = new Map<string, SSEServerTransport>();
+function readBody(req: IncomingMessage): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const chunks: Buffer[] = [];
+    req.on('data', (chunk: Buffer) => chunks.push(chunk));
+    req.on('end', () => resolve(Buffer.concat(chunks).toString()));
+    req.on('error', reject);
+  });
+}
+
+const transports = new Map<string, StreamableHTTPServerTransport>();
 
 const httpServer = createServer(async (req: IncomingMessage, res: ServerResponse) => {
   const url = new URL(req.url ?? '/', `http://localhost:${PORT}`);
 
   res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, DELETE, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, mcp-session-id');
 
   if (req.method === 'OPTIONS') {
     res.writeHead(204);
@@ -226,34 +241,60 @@ const httpServer = createServer(async (req: IncomingMessage, res: ServerResponse
     return;
   }
 
-  if (url.pathname === '/sse' && req.method === 'GET') {
-    const transport = new SSEServerTransport('/messages', res);
-    transports.set(transport.sessionId, transport);
+  if (url.pathname === '/mcp') {
+    const sessionId = req.headers['mcp-session-id'] as string | undefined;
 
-    res.on('close', () => {
-      transports.delete(transport.sessionId);
-    });
+    if (req.method === 'POST') {
+      let body: unknown;
+      try {
+        const rawBody = await readBody(req);
+        body = JSON.parse(rawBody);
+      } catch {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'Invalid JSON body' }));
+        return;
+      }
 
-    await server.connect(transport);
-    return;
-  }
+      if (sessionId && transports.has(sessionId)) {
+        await transports.get(sessionId)!.handleRequest(req, res, body);
+        return;
+      }
 
-  if (url.pathname === '/messages' && req.method === 'POST') {
-    const sessionId = url.searchParams.get('sessionId');
-    if (!sessionId) {
+      if (isInitializeRequest(body)) {
+        const transport = new StreamableHTTPServerTransport({
+          sessionIdGenerator: () => randomUUID(),
+          onsessioninitialized: (id) => {
+            transports.set(id, transport);
+          },
+          onsessionclosed: (id) => {
+            transports.delete(id);
+          },
+        });
+
+        const server = createMcpServer();
+        await server.connect(transport);
+        await transport.handleRequest(req, res, body);
+        return;
+      }
+
       res.writeHead(400, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ error: 'Missing sessionId' }));
+      res.end(JSON.stringify({ error: 'Missing session ID or not an initialize request' }));
       return;
     }
 
-    const transport = transports.get(sessionId);
-    if (!transport) {
-      res.writeHead(404, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ error: 'Session not found' }));
+    if (req.method === 'GET' || req.method === 'DELETE') {
+      if (sessionId && transports.has(sessionId)) {
+        await transports.get(sessionId)!.handleRequest(req, res);
+        return;
+      }
+
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'Missing or invalid session ID' }));
       return;
     }
 
-    await transport.handlePostMessage(req, res);
+    res.writeHead(405, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ error: 'Method not allowed' }));
     return;
   }
 
@@ -263,6 +304,6 @@ const httpServer = createServer(async (req: IncomingMessage, res: ServerResponse
 
 httpServer.listen(PORT, '0.0.0.0', () => {
   console.log(`Jurnal MCP server running on http://0.0.0.0:${PORT}`);
-  console.log(`SSE endpoint: http://0.0.0.0:${PORT}/sse`);
-  console.log(`Health check: http://0.0.0.0:${PORT}/health`);
+  console.log(`MCP endpoint:  http://0.0.0.0:${PORT}/mcp`);
+  console.log(`Health check:  http://0.0.0.0:${PORT}/health`);
 });
