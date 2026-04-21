@@ -4,7 +4,7 @@ MCP server that wraps the Jurnal.id REST API, deployable as a Docker container.
 
 ## Prerequisites
 
-- Docker and Docker Compose installed
+- Docker installed
 
 ## Configuration
 
@@ -20,10 +20,35 @@ JURNAL_CLIENT_SECRET=your_client_secret_here
 MCP_PORT=3000
 ```
 
+## Running with Docker
+
+```bash
+# Build the image
+docker build -t jurnal-mcp .
+
+# Run the container
+docker run -d \
+  --name jurnal-mcp \
+  --restart unless-stopped \
+  -p 3000:3000 \
+  --env-file .env \
+  jurnal-mcp
+```
+
+### Useful commands
+
+```bash
+docker logs jurnal-mcp        # view logs
+docker logs -f jurnal-mcp     # follow logs live
+docker restart jurnal-mcp     # restart
+docker stop jurnal-mcp        # stop
+docker rm jurnal-mcp          # remove container
+```
+
 ## Running with Docker Compose
 
 ```bash
-docker compose up -d
+docker-compose up --build -d
 ```
 
 ## Running locally without Docker
@@ -40,6 +65,9 @@ npm start
 - **Transport**: SSE
 - **SSE endpoint**: `http://your-host:3000/sse`
 - **No authentication required** at the MCP level (Jurnal auth is handled internally)
+
+The server binds to `0.0.0.0:3000` and is accessible from any machine on the same network.
+To find your server's IP: `hostname -I`
 
 ## Available Tools
 
