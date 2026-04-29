@@ -16,8 +16,9 @@ export const createReceivePaymentSchema = z.object({
   invoice_id: z.string().describe('Invoice ID to apply payment to'),
   transaction_date: z.string().describe('Payment date in YYYY-MM-DD format'),
   amount: z.number().positive().describe('Payment amount'),
-  custom_id: z.string().describe('Custom payment reference ID'),
-  memo: z.string().describe('Payment memo/note'),
+  payment_account_id: z.number().int().positive().describe('ID of the bank/cash account that received the payment (required by Jurnal.id)'),
+  custom_id: z.string().optional().describe('Custom payment reference ID (optional)'),
+  memo: z.string().optional().describe('Payment memo/note (optional)'),
 });
 
 interface PaymentItem {
@@ -60,13 +61,18 @@ export async function getReceivePaymentsByInvoice(params: z.infer<typeof getRece
 }
 
 export async function createReceivePayment(params: z.infer<typeof createReceivePaymentSchema>) {
-  const body = {
+  const body: Record<string, unknown> = {
     receive_payment: {
-      invoice_id: params.invoice_id,
       transaction_date: params.transaction_date,
-      amount: params.amount,
-      custom_id: params.custom_id,
-      memo: params.memo,
+      payment_account_id: params.payment_account_id,
+      ...(params.custom_id ? { custom_id: params.custom_id } : {}),
+      ...(params.memo ? { memo: params.memo } : {}),
+      payment_lines_attributes: [
+        {
+          invoice_id: params.invoice_id,
+          amount: params.amount,
+        },
+      ],
     },
   };
 

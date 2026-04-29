@@ -1,0 +1,284 @@
+Build a Model Context Protocol (MCP) server in Node.js (TypeScript) that wraps the Jurnal.id REST API,
+deployable as a Docker container.
+
+## Authentication
+
+Jurnal.id uses HMAC-SHA256 authentication. Every request must include two headers generated fresh per request:
+
+- `Date` header: current UTC date string
+- `Authorization` header: HMAC signature
+
+Here is the reference implementation (originally written for Postman's CryptoJS environment — adapt it to Node.js `crypto` module):
+
+```javascript
+const hmac_username = 'vH4JIRets0XXefQ0';
+const hmac_secret = 'j0GkpbnBXYltLSFAXl9Ilhn98u8vGLg4';
+
+const requestUrl = url.parse(request['url']);
+const requestLine = pm.request.method + ' ' + requestUrl.path + ' HTTP/1.1';
+const dateString = new Date().toUTCString();
+const digest = CryptoJS.HmacSHA256(['date: ' + dateString, requestLine].join('\n'), hmac_secret);
+const signature = CryptoJS.enc.Base64.stringify(digest);
+const hmac_header = 'hmac username="' + hmac_username + '", algorithm="hmac-sha256", headers="date request-line", signature="' + signature + '"';
+```
+
+Translate this to Node.js using the built-in `crypto` module (`createHmac`). The signing string is:
+
+  date: {dateString}\n{METHOD} {path} HTTP/1.1
+
+Store `JURNAL_CLIENT_ID` and `JURNAL_CLIENT_SECRET` in environment variables, not hardcoded. The values above are for reference only.
+
+The base URL for all Jurnal.id API calls is: https://api.jurnal.id
+
+Create a shared jurnalRequest(method, path, params?, body?) helper function that:
+1. Generates a fresh Date string
+2. Builds the signing string using method + path
+3. Creates the HMAC-SHA256 signature
+4. Makes the HTTP request with `Authorization` and `Date` headers
+5. Returns parsed JSON response
+6. Throws meaningful errors if the API returns non-2xx
+
+
+## MCP Server Tools
+
+Implement the following tools. All tool names use snake_case. All parameters should have clear descriptions.
+
+
+### Sales Orders
+
+**list_sales_orders**
+- GET /api/v1/sales_orders
+- params: `status` (string, enum: open|closed|all, default: "open"), `page` (number, default: 1), `page_size` (number, default: 20), `sort_by` (string, default: "transaction_date"), `sort_order` (string, default: "desc")
+- returns: array of sales orders with id, number, customer name, date, total, status
+
+**get_sales_order**
+- GET /api/v1/sales_orders/{id}
+- params: `id` (string, required)
+- returns: full sales order detail including line items
+
+**close_sales_order**
+- PATCH or PUT /api/v1/sales_orders/{id}/close (check Jurnal.id docs — use the correct verb)
+- params: `id` (string, required)
+- returns: updated sales order
+
+**create_sales_order**
+- POST /api/v1/sales_orders
+- params: `customer_id` (string), `transaction_date` (string YYYY-MM-DD), `line_items` (array of {product_id, quantity, unit_price}), `memo` (string, optional)
+- returns: created sales order with id and number
+
+
+### Delivery Orders
+
+**create_delivery_order**
+- POST /api/v1/delivery_orders
+- params: `sales_order_id` (string), `transaction_date` (string YYYY-MM-DD), `memo` (string, optional)
+- returns: created delivery order
+
+
+### Sales Invoices
+
+**list_sales_invoices**
+- GET /api/v1/sales_invoices
+- params: `page` (number, default: 1), `page_size` (number, default: 10), `sort_by` (string, default: "transaction_date"), `sort_order` (string, default: "desc")
+- returns: array of invoices
+
+
+### Receive Payments
+
+**list_receive_payments**
+- GET /api/v1/receive_payments
+- params: `page` (number, default: 1), `page_size` (number, default: 1), `sort_by` (string, default: "created_at"), `sort_order` (string, default: "desc")
+- returns: array of receive payments including custom_id
+
+**get_receive_payments_by_invoice**
+- GET /api/v1/receive_payments?invoice_id={invoice_id}
+- params: `invoice_id` (string, required)
+- returns: payments for that invoice, total paid, remaining balance
+
+**create_receive_payment**
+- POST /api/v1/receive_payments
+- params: `invoice_id` (string), `transaction_date` (string YYYY-MM-DD), `amount` (number), `custom_id` (string), `memo` (string)
+- returns: created receive payment
+
+
+## Project Structure
+
+jurnal-mcp/
+├── src/
+│   ├── index.ts              # MCP server entry point
+│   ├── jurnal-client.ts      # HMAC auth + HTTP helper
+│   └── tools/
+│       ├── sales-orders.ts
+│       ├── delivery-orders.ts
+│       ├── invoices.ts
+│       └── payments.ts
+├── Dockerfile
+├── docker-compose.yml
+├── .dockerignore
+├── package.json
+├── tsconfig.json
+├── .env.example
+└── README.md
+
+
+## Dependencies
+
+Use:
+- @modelcontextprotocol/sdk  — MCP server SDK
+- zod                        — parameter validation and schema definition for each tool
+- Node.js built-in `crypto` and `fetch` for HTTP
+
+Do NOT use axios or any heavy HTTP library — keep dependencies minimal.
+
+
+## .env.example
+
+JURNAL_CLIENT_ID=your_client_id_here
+JURNAL_CLIENT_SECRET=your_client_secret_here
+MCP_PORT=3000
+
+
+## Docker Requirements
+
+### Dockerfile
+
+Create a production-ready multi-stage Dockerfile:
+
+Stage 1 — builder:
+- Use node:20-alpine as base
+- Copy package.json and package-lock.json
+- Run npm ci
+- Copy source files
+- Run tsc to compile TypeScript to /dist
+
+Stage 2 — production:
+- Use node:20-alpine as base (fresh, no dev dependencies)
+- Copy only /dist and node_modules from builder stage
+- Set NODE_ENV=production
+- Expose port 3000
+- Run as non-root user (use `node` user that alpine provides)
+- CMD ["node", "dist/index.js"]
+
+### docker-compose.yml
+
+Create a docker-compose.yml that:
+- Builds from the local Dockerfile
+- Service name: jurnal-mcp
+- Restart policy: unless-stopped
+- Port mapping: 3000:3000
+- Passes environment variables from a .env file
+- Includes a healthcheck that hits GET /health every 30s with a 10s timeout
+- Mounts no volumes (stateless service)
+
+Example structure:
+
+```yaml
+version: '3.8'
+services:
+  jurnal-mcp:
+    build: .
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    env_file:
+      - .env
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+```
+
+### Health Check Endpoint
+
+Add a GET /health HTTP endpoint to the MCP server that returns:
+
+```json
+{ "status": "ok", "service": "jurnal-mcp", "timestamp": "2026-04-21T10:00:00.000Z" }
+```
+
+This is used by Docker to determine container health. It should NOT require authentication.
+
+### .dockerignore
+
+Include a .dockerignore file that excludes:
+- node_modules
+- dist
+- .env
+- .env.*  (but NOT .env.example)
+- *.log
+- .git
+- README.md
+
+
+## Transport Mode
+
+The MCP server must support HTTP/SSE transport (not just stdio) so it can run as a network
+service inside Docker and be reachable by n8n or Claude.ai remote MCP connections.
+
+Use the SSE transport from @modelcontextprotocol/sdk:
+
+```typescript
+import { SSEServerTransport } from '@modelcontextprotocol/sdk/server/sse.js';
+```
+
+The server should listen on 0.0.0.0 (not localhost) so it is reachable from outside the container.
+Port should be read from the MCP_PORT environment variable, defaulting to 3000.
+
+
+## README.md
+
+Include a README.md with the following sections:
+
+### Prerequisites
+- Docker and Docker Compose installed
+
+### Configuration
+- Copy .env.example to .env
+- Fill in JURNAL_CLIENT_ID and JURNAL_CLIENT_SECRET
+
+### Running with Docker Compose
+```bash
+docker compose up -d
+```
+
+### Running locally without Docker
+```bash
+npm install
+npm run build
+npm start
+```
+
+### Connecting to Claude.ai or n8n
+- MCP server URL: http://your-host:3000
+- Transport: SSE
+- No authentication required at the MCP level (Jurnal auth is handled internally)
+
+### Available Tools
+List all tools with a one-line description each.
+
+
+## Important Notes
+
+1. The HMAC signature must be regenerated on every request — do not cache the Date or signature.
+
+2. The `path` used in the signing string must include query parameters
+   (e.g. /api/v1/sales_orders?status=open&page=1), matching exactly what is sent in the request.
+
+3. All tools should return clean, structured data — not raw API responses. Strip unnecessary nesting.
+
+4. If the Jurnal.id API returns an error, surface the error message clearly in the tool result
+   so Claude can explain it to the user.
+
+5. After implementing all tools, verify the HMAC implementation by testing list_sales_orders
+   against the live API and confirming a 200 response.
+
+6. Check the actual Jurnal.id Swagger documentation at https://api-doc.jurnal.id and correct
+   any endpoint paths that differ from the ones listed above, especially close_sales_order
+   and create_delivery_order which vary between APIs.
+
+7. The container must be stateless — no file system writes, no SQLite, no local cache.
+   All state lives in the Jurnal.id API.
+
+8. Never log the JURNAL_CLIENT_SECRET or Authorization header values to stdout.

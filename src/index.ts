@@ -39,6 +39,11 @@ import {
   createReceivePayment,
 } from './tools/payments.js';
 
+import {
+  getBankAccountsSchema,
+  getBankAccounts,
+} from './tools/bank-accounts.js';
+
 const PORT = parseInt(process.env.MCP_PORT ?? '3000', 10);
 
 function zodToJsonSchema(schema: z.ZodObject<z.ZodRawShape>): Record<string, unknown> {
@@ -148,6 +153,11 @@ function createMcpServer(): Server {
         description: 'Record a new payment received against an invoice',
         inputSchema: zodToJsonSchema(createReceivePaymentSchema),
       },
+      {
+        name: 'get_bank_accounts',
+        description: 'List bank/cash accounts from Jurnal.id. Use this to find the payment_account_id for a bank account number before creating a receive payment.',
+        inputSchema: zodToJsonSchema(getBankAccountsSchema),
+      },
     ],
   }));
 
@@ -184,6 +194,9 @@ function createMcpServer(): Server {
           break;
         case 'create_receive_payment':
           result = await createReceivePayment(createReceivePaymentSchema.parse(args));
+          break;
+        case 'get_bank_accounts':
+          result = await getBankAccounts(getBankAccountsSchema.parse(args));
           break;
         default:
           return {
