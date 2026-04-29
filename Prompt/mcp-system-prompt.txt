@@ -399,10 +399,14 @@ Parameters:
 
 account_number → destination bank account number extracted from the payment proof (partial number is acceptable)
 
-From the result, identify the matching bank account and take its id field.
-This id is the payment_account_id required in the next step.
+The result contains an "accounts" array. For each account, the id field is the payment_account_id.
+Match the account_number field against the destination bank account number from the payment proof.
 
-If no match is found, present the full list of bank accounts to the user and ask them to select the correct one.
+If the accounts array is empty, check the "_raw" field in the result to see the actual API response structure and report it to the user.
+
+If no matching account is found, present the full accounts list to the user and ask them to select the correct one.
+
+If get_bank_accounts returns an error, report the exact error message (including the HTTP status code number) to the user so it can be diagnosed.
 
 STEP 2 — Create the receive payment
 

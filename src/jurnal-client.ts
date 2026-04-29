@@ -59,13 +59,13 @@ export async function jurnalRequest<T = unknown>(
   const response = await fetch(url, fetchOptions);
 
   if (!response.ok) {
-    let errorMessage = `Jurnal API error: ${response.status} ${response.statusText}`;
+    let errorMessage = `Jurnal API error ${response.status} ${response.statusText}`;
     try {
       const errorBody = await response.json() as { message?: string; errors?: unknown };
       if (errorBody.message) {
-        errorMessage = `Jurnal API error: ${errorBody.message}`;
+        errorMessage = `Jurnal API error ${response.status}: ${errorBody.message}`;
       } else if (errorBody.errors) {
-        errorMessage = `Jurnal API error: ${JSON.stringify(errorBody.errors)}`;
+        errorMessage = `Jurnal API error ${response.status}: ${JSON.stringify(errorBody.errors)}`;
       }
     } catch {
       // ignore JSON parse error, use default message
