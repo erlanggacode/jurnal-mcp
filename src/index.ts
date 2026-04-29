@@ -54,6 +54,11 @@ import {
   listCustomers,
 } from './tools/customers.js';
 
+import {
+  getAccountsSchema,
+  getAccounts,
+} from './tools/accounts.js';
+
 const VERSION = '1.2.0';
 const PORT = parseInt(process.env.MCP_PORT ?? '3000', 10);
 
@@ -179,6 +184,11 @@ function createMcpServer(): Server {
         description: 'List customers from Jurnal.id with optional name search',
         inputSchema: zodToJsonSchema(listCustomersSchema),
       },
+      {
+        name: 'get_accounts',
+        description: 'List chart of accounts from Jurnal.id. Useful for finding account IDs including bank and cash accounts.',
+        inputSchema: zodToJsonSchema(getAccountsSchema),
+      },
     ],
   }));
 
@@ -224,6 +234,9 @@ function createMcpServer(): Server {
           break;
         case 'list_customers':
           result = await listCustomers(listCustomersSchema.parse(args));
+          break;
+        case 'get_accounts':
+          result = await getAccounts(getAccountsSchema.parse(args));
           break;
         default:
           return {
