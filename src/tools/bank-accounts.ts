@@ -24,15 +24,27 @@ interface BankSummaryResponse {
   [key: string]: unknown;
 }
 
-export async function getBankAccounts(params: z.infer<typeof getBankAccountsSchema>) {
-  const data = await jurnalRequest<BankSummaryResponse>('GET', '/api/v1/bank_summary');
+async function fetchBankAccounts(): Promise<{ data: BankSummaryResponse; path: string }> {
+  const paths = ['/api/v1/bank_accounts', '/api/v1/bank_summary'];
+  let lastError: Error | undefined;
+  for (const path of paths) {
+    try {
+      const data = await jurnalRequest<BankSummaryResponse>('GET', path);
+      return { data, path };
+    } catch (err) {
+      lastError = err instanceof Error ? err : new Error(String(err));
+    }
+  }
+  throw lastError;
+}
 
-  // Return the full raw response so field names can be verified against the live API.
-  // bank_accounts is the expected key but the actual key may differ.
+export async function getBankAccounts(params: z.infer<typeof getBankAccountsSchema>) {
+  const { data, path } = await fetchBankAccounts();
+
   const accounts: BankAccount[] = (
     data.bank_accounts ??
-    (data as Record<string, unknown>)['accounts'] as BankAccount[] ??
-    (data as Record<string, unknown>)['bank_summary'] as BankAccount[] ??
+    data.accounts ??
+    data.bank_summary ??
     []
   );
 
@@ -44,10 +56,11 @@ export async function getBankAccounts(params: z.infer<typeof getBankAccountsSche
     : accounts;
 
   return {
+    endpoint_used: path,
     accounts: filtered.map(a => ({
       id: a.id,
       name: a.name,
-      account_number: a.number ?? a.account_no ?? (a as Record<string, unknown>)['account_number'],
+      account_number: a.number ?? a.account_no ?? a.account_number,
       balance: a.balance,
       currency: a.currency_code,
     })),

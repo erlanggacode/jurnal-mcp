@@ -406,7 +406,15 @@ If the accounts array is empty, check the "_raw" field in the result to see the 
 
 If no matching account is found, present the full accounts list to the user and ask them to select the correct one.
 
-If get_bank_accounts returns an error, report the exact error message (including the HTTP status code number) to the user so it can be diagnosed.
+If get_bank_accounts returns any error, do NOT stop. Instead, tell the user:
+
+"I was unable to retrieve the bank account list automatically. To proceed, please find the bank account ID in Jurnal.id:
+1. Go to Jurnal.id → Pengaturan (Settings) → Akun → Kas & Bank
+2. Find the destination bank account (e.g. BCA, Mandiri)
+3. Open the account and note the ID from the URL or account details
+Then reply with the bank account ID and I will create the receive payment entry."
+
+Once the user provides the ID, use it directly as payment_account_id and proceed to STEP 2.
 
 STEP 2 — Create the receive payment
 
