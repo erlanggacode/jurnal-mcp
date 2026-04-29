@@ -8,13 +8,8 @@ export const getBankAccountsSchema = z.object({
 
 interface BankAccount {
   id: number | string;
-  name?: string;
-  number?: string;
-  account_no?: string;
-  account_number?: string;
-  balance?: number;
-  currency_code?: string;
-  [key: string]: unknown;
+  name: string;
+  number: string;
 }
 
 interface BankSummaryResponse {
@@ -24,13 +19,26 @@ interface BankSummaryResponse {
   [key: string]: unknown;
 }
 
-async function fetchBankAccounts(): Promise<{ data: BankSummaryResponse; path: string }> {
+function loadFromEnv(): BankAccount[] | null {
+  const raw = process.env.BANK_ACCOUNT_MAPPINGS;
+  if (!raw) return null;
+  try {
+    const parsed = JSON.parse(raw) as BankAccount[];
+    if (!Array.isArray(parsed)) return null;
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+async function fetchFromApi(): Promise<BankAccount[]> {
   const paths = ['/api/v1/bank_accounts', '/api/v1/bank_summary'];
   let lastError: Error | undefined;
   for (const path of paths) {
     try {
       const data = await jurnalRequest<BankSummaryResponse>('GET', path);
-      return { data, path };
+      const accounts = data.bank_accounts ?? data.accounts ?? data.bank_summary ?? [];
+      return accounts as BankAccount[];
     } catch (err) {
       lastError = err instanceof Error ? err : new Error(String(err));
     }
@@ -39,31 +47,20 @@ async function fetchBankAccounts(): Promise<{ data: BankSummaryResponse; path: s
 }
 
 export async function getBankAccounts(params: z.infer<typeof getBankAccountsSchema>) {
-  const { data, path } = await fetchBankAccounts();
-
-  const accounts: BankAccount[] = (
-    data.bank_accounts ??
-    data.accounts ??
-    data.bank_summary ??
-    []
-  );
+  const envAccounts = loadFromEnv();
+  const source = envAccounts ? 'config' : 'api';
+  const accounts = envAccounts ?? await fetchFromApi();
 
   const filtered = params.account_number
-    ? accounts.filter(a => {
-        const num = String(a.number ?? a.account_no ?? a.account_number ?? '');
-        return num.includes(params.account_number!);
-      })
+    ? accounts.filter(a => String(a.number ?? '').includes(params.account_number!))
     : accounts;
 
   return {
-    endpoint_used: path,
+    source,
     accounts: filtered.map(a => ({
       id: a.id,
       name: a.name,
-      account_number: a.number ?? a.account_no ?? a.account_number,
-      balance: a.balance,
-      currency: a.currency_code,
+      account_number: a.number,
     })),
-    _raw: data,
   };
 }
