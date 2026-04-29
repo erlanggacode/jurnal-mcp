@@ -227,7 +227,9 @@ If the image IS a proof of payment, extract the following information:
 - transfer amount
 - transaction date
 - payer name
-- bank name
+- sender bank name
+- destination bank name
+- destination bank account number (the account the money was sent TO)
 - transfer reference number
 - invoice number if visible
 - customer name if visible
@@ -385,7 +387,26 @@ Only request the image again if the earlier payment data is unavailable.
 RECEIVE PAYMENT CREATION
 ------------------------------------------------
 
-After the user confirms the invoice, call:
+After the user confirms the invoice, follow these steps in order:
+
+STEP 1 — Resolve the bank account ID
+
+Call:
+
+get_bank_accounts
+
+Parameters:
+
+account_number → destination bank account number extracted from the payment proof (partial number is acceptable)
+
+From the result, identify the matching bank account and take its id field.
+This id is the payment_account_id required in the next step.
+
+If no match is found, present the full list of bank accounts to the user and ask them to select the correct one.
+
+STEP 2 — Create the receive payment
+
+Call:
 
 create_receive_payment
 
@@ -394,6 +415,7 @@ Parameters:
 transaction_date → extracted payment date (YYYY-MM-DD)
 invoice_id → confirmed invoice ID
 amount → transferred amount
+payment_account_id → id returned from get_bank_accounts in STEP 1
 custom_id → generated value (see CUSTOM ID GENERATION below)
 memo → generated value (see MEMO GENERATION below)
 
