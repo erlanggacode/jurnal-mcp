@@ -54,6 +54,7 @@ import {
   listCustomers,
 } from './tools/customers.js';
 
+const VERSION = '1.2.0';
 const PORT = parseInt(process.env.MCP_PORT ?? '3000', 10);
 
 function zodToJsonSchema(schema: z.ZodObject<z.ZodRawShape>): Record<string, unknown> {
@@ -275,6 +276,7 @@ const httpServer = createServer(async (req: IncomingMessage, res: ServerResponse
     res.end(JSON.stringify({
       status: 'ok',
       service: 'jurnal-mcp',
+      version: VERSION,
       timestamp: new Date().toISOString(),
     }));
     return;
