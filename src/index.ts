@@ -44,6 +44,16 @@ import {
   getBankAccounts,
 } from './tools/bank-accounts.js';
 
+import {
+  listJournalEntriesSchema,
+  listJournalEntries,
+} from './tools/journal-entries.js';
+
+import {
+  listCustomersSchema,
+  listCustomers,
+} from './tools/customers.js';
+
 const PORT = parseInt(process.env.MCP_PORT ?? '3000', 10);
 
 function zodToJsonSchema(schema: z.ZodObject<z.ZodRawShape>): Record<string, unknown> {
@@ -158,6 +168,16 @@ function createMcpServer(): Server {
         description: 'List bank/cash accounts from Jurnal.id. Use this to find the payment_account_id for a bank account number before creating a receive payment.',
         inputSchema: zodToJsonSchema(getBankAccountsSchema),
       },
+      {
+        name: 'list_journal_entries',
+        description: 'List general journal entries from Jurnal.id with optional date range filtering',
+        inputSchema: zodToJsonSchema(listJournalEntriesSchema),
+      },
+      {
+        name: 'list_customers',
+        description: 'List customers from Jurnal.id with optional name search',
+        inputSchema: zodToJsonSchema(listCustomersSchema),
+      },
     ],
   }));
 
@@ -197,6 +217,12 @@ function createMcpServer(): Server {
           break;
         case 'get_bank_accounts':
           result = await getBankAccounts(getBankAccountsSchema.parse(args));
+          break;
+        case 'list_journal_entries':
+          result = await listJournalEntries(listJournalEntriesSchema.parse(args));
+          break;
+        case 'list_customers':
+          result = await listCustomers(listCustomersSchema.parse(args));
           break;
         default:
           return {
