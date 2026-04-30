@@ -17,6 +17,8 @@ export const getExpenseSchema = z.object({
 export const createExpenseSchema = z.object({
   transaction_date: z.string().describe('Expense date (YYYY-MM-DD)'),
   payment_account_id: z.number().int().positive().describe('ID of the bank/cash account used to pay. Use get_accounts to find the correct ID.'),
+  payment_method_id: z.number().int().positive().describe('Payment method ID (e.g. Transfer Bank). Use get_payment_methods to find the correct ID.'),
+  payment_method_name: z.string().optional().describe('Payment method name (e.g. "Transfer Bank"). Use get_payment_methods to find the correct name.'),
   transaction_no: z.string().optional().describe('Expense reference number (optional)'),
   memo: z.string().optional().describe('Expense note/description (optional)'),
   tags_string: z.string().optional().describe('Comma-separated list of tags to attach (e.g. "marketing,travel,office")'),
@@ -31,6 +33,8 @@ export const updateExpenseSchema = z.object({
   id: z.number().int().positive().describe('Expense ID to update'),
   transaction_date: z.string().optional().describe('Expense date (YYYY-MM-DD)'),
   payment_account_id: z.number().int().positive().optional().describe('ID of the bank/cash account used to pay'),
+  payment_method_id: z.number().int().positive().optional().describe('Payment method ID. Use get_payment_methods to find the correct ID.'),
+  payment_method_name: z.string().optional().describe('Payment method name (e.g. "Transfer Bank")'),
   transaction_no: z.string().optional().describe('Expense reference number'),
   memo: z.string().optional().describe('Expense note/description'),
   tags_string: z.string().optional().describe('Comma-separated list of tags (e.g. "marketing,travel"). Replaces all existing tags. Pass empty string to remove all tags.'),
@@ -140,6 +144,8 @@ export async function createExpense(params: z.infer<typeof createExpenseSchema>)
     expense: {
       transaction_date: params.transaction_date,
       payment_account_id: params.payment_account_id,
+      payment_method_id: params.payment_method_id,
+      ...(params.payment_method_name ? { payment_method_name: params.payment_method_name } : {}),
       ...(params.transaction_no ? { transaction_no: params.transaction_no } : {}),
       ...(params.memo ? { memo: params.memo } : {}),
       ...(params.tags_string !== undefined ? { tags_string: params.tags_string } : {}),
@@ -167,6 +173,8 @@ export async function updateExpense(params: z.infer<typeof updateExpenseSchema>)
 
   if (fields.transaction_date) expenseBody['transaction_date'] = fields.transaction_date;
   if (fields.payment_account_id) expenseBody['payment_account_id'] = fields.payment_account_id;
+  if (fields.payment_method_id) expenseBody['payment_method_id'] = fields.payment_method_id;
+  if (fields.payment_method_name) expenseBody['payment_method_name'] = fields.payment_method_name;
   if (fields.transaction_no) expenseBody['transaction_no'] = fields.transaction_no;
   if (fields.memo !== undefined) expenseBody['memo'] = fields.memo;
   if (fields.tags_string !== undefined) expenseBody['tags_string'] = fields.tags_string;
