@@ -141,7 +141,7 @@ export async function getExpense(params: z.infer<typeof getExpenseSchema>) {
 
 export async function createExpense(params: z.infer<typeof createExpenseSchema>) {
   const body = {
-    expense: {
+    transaction: {
       transaction_date: params.transaction_date,
       payment_account_id: params.payment_account_id,
       payment_method_id: params.payment_method_id,
@@ -152,7 +152,7 @@ export async function createExpense(params: z.infer<typeof createExpenseSchema>)
       transaction_account_lines_attributes: params.expense_lines_attributes.map(line => ({
         account_id: line.account_id,
         amount: line.amount,
-        ...(line.memo ? { memo: line.memo } : {}),
+        ...(line.memo ? { description: line.memo } : {}),
       })),
     },
   };
@@ -183,12 +183,12 @@ export async function updateExpense(params: z.infer<typeof updateExpenseSchema>)
       ...(line.id ? { id: line.id } : {}),
       account_id: line.account_id,
       amount: line.amount,
-      ...(line.memo ? { memo: line.memo } : {}),
+      ...(line.memo ? { description: line.memo } : {}),
       ...(line._destroy ? { _destroy: true } : {}),
     }));
   }
 
-  const data = await jurnalRequest<ExpensesResponse>('PUT', `/api/v1/expenses/${id}`, undefined, { expense: expenseBody });
+  const data = await jurnalRequest<ExpensesResponse>('PUT', `/api/v1/expenses/${id}`, undefined, { transaction: expenseBody });
   const expense = data.expense ?? data as unknown as Expense;
   return {
     id: expense.id,

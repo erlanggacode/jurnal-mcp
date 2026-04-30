@@ -77,7 +77,7 @@ import {
   deleteExpense,
 } from './tools/expenses.js';
 
-const VERSION = '1.3.0';
+const VERSION = '1.4.0';
 const PORT = parseInt(process.env.MCP_PORT ?? '3000', 10);
 
 function zodToJsonSchema(schema: z.ZodObject<z.ZodRawShape>): Record<string, unknown> {
