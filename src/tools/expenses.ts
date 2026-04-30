@@ -148,7 +148,7 @@ export async function createExpense(params: z.infer<typeof createExpenseSchema>)
       ...(params.payment_method_name ? { payment_method_name: params.payment_method_name } : {}),
       ...(params.transaction_no ? { transaction_no: params.transaction_no } : {}),
       ...(params.memo ? { memo: params.memo } : {}),
-      ...(params.tags_string !== undefined ? { tags_string: params.tags_string } : {}),
+      ...(params.tags_string !== undefined ? { tag_list: params.tags_string.split(',').map(t => t.trim()).filter(Boolean) } : {}),
       transaction_account_lines_attributes: params.expense_lines_attributes.map(line => ({
         account_id: line.account_id,
         amount: line.amount,
@@ -177,7 +177,7 @@ export async function updateExpense(params: z.infer<typeof updateExpenseSchema>)
   if (fields.payment_method_name) expenseBody['payment_method_name'] = fields.payment_method_name;
   if (fields.transaction_no) expenseBody['transaction_no'] = fields.transaction_no;
   if (fields.memo !== undefined) expenseBody['memo'] = fields.memo;
-  if (fields.tags_string !== undefined) expenseBody['tags_string'] = fields.tags_string;
+  if (fields.tags_string !== undefined) expenseBody['tag_list'] = fields.tags_string.split(',').map(t => t.trim()).filter(Boolean);
   if (fields.expense_lines_attributes) {
     expenseBody['transaction_account_lines_attributes'] = fields.expense_lines_attributes.map(line => ({
       ...(line.id ? { id: line.id } : {}),

@@ -1,6 +1,6 @@
 {
   "name": "jurnal-mcp",
-  "version": "1.4.0",
+  "version": "1.4.1",
   "description": "MCP server wrapping the Jurnal.id REST API",
   "type": "module",
   "main": "dist/index.js",
