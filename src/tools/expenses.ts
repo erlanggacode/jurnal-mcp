@@ -19,6 +19,7 @@ export const createExpenseSchema = z.object({
   payment_account_id: z.number().int().positive().describe('ID of the bank/cash account used to pay. Use get_accounts to find the correct ID.'),
   transaction_no: z.string().optional().describe('Expense reference number (optional)'),
   memo: z.string().optional().describe('Expense note/description (optional)'),
+  tags_string: z.string().optional().describe('Comma-separated list of tags to attach (e.g. "marketing,travel,office")'),
   expense_lines_attributes: z.array(z.object({
     account_id: z.number().int().positive().describe('Expense account ID'),
     amount: z.number().positive().describe('Amount for this line'),
@@ -32,6 +33,7 @@ export const updateExpenseSchema = z.object({
   payment_account_id: z.number().int().positive().optional().describe('ID of the bank/cash account used to pay'),
   transaction_no: z.string().optional().describe('Expense reference number'),
   memo: z.string().optional().describe('Expense note/description'),
+  tags_string: z.string().optional().describe('Comma-separated list of tags (e.g. "marketing,travel"). Replaces all existing tags. Pass empty string to remove all tags.'),
   expense_lines_attributes: z.array(z.object({
     id: z.number().int().optional().describe('Existing line item ID (required when updating an existing line)'),
     account_id: z.number().int().positive().describe('Expense account ID'),
@@ -54,6 +56,12 @@ interface ExpenseLine {
   [key: string]: unknown;
 }
 
+interface Tag {
+  id?: number | string;
+  name?: string;
+  [key: string]: unknown;
+}
+
 interface Expense {
   id: number | string;
   transaction_no?: string;
@@ -63,6 +71,8 @@ interface Expense {
   memo?: string;
   amount?: number;
   status?: string;
+  tags?: Tag[];
+  tags_string?: string;
   expense_lines?: ExpenseLine[];
   [key: string]: unknown;
 }
@@ -95,6 +105,7 @@ export async function listExpenses(params: z.infer<typeof listExpensesSchema>) {
       amount: e.amount,
       memo: e.memo,
       status: e.status,
+      tags: (e.tags ?? []).map((t: Tag) => t.name),
     })),
     _raw_keys: data.expenses ? undefined : Object.keys(data),
   };
@@ -112,6 +123,8 @@ export async function getExpense(params: z.infer<typeof getExpenseSchema>) {
     amount: expense.amount,
     memo: expense.memo,
     status: expense.status,
+    tags: (expense.tags ?? []).map((t: Tag) => t.name),
+    tags_string: expense.tags_string,
     lines: (expense.expense_lines ?? []).map((l: ExpenseLine) => ({
       id: l.id,
       account_id: l.account_id,
@@ -129,6 +142,7 @@ export async function createExpense(params: z.infer<typeof createExpenseSchema>)
       payment_account_id: params.payment_account_id,
       ...(params.transaction_no ? { transaction_no: params.transaction_no } : {}),
       ...(params.memo ? { memo: params.memo } : {}),
+      ...(params.tags_string !== undefined ? { tags_string: params.tags_string } : {}),
       expense_lines_attributes: params.expense_lines_attributes.map(line => ({
         account_id: line.account_id,
         amount: line.amount,
@@ -155,6 +169,7 @@ export async function updateExpense(params: z.infer<typeof updateExpenseSchema>)
   if (fields.payment_account_id) expenseBody['payment_account_id'] = fields.payment_account_id;
   if (fields.transaction_no) expenseBody['transaction_no'] = fields.transaction_no;
   if (fields.memo !== undefined) expenseBody['memo'] = fields.memo;
+  if (fields.tags_string !== undefined) expenseBody['tags_string'] = fields.tags_string;
   if (fields.expense_lines_attributes) {
     expenseBody['expense_lines_attributes'] = fields.expense_lines_attributes.map(line => ({
       ...(line.id ? { id: line.id } : {}),
