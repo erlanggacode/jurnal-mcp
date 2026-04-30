@@ -13,12 +13,15 @@ export const getReceivePaymentsByInvoiceSchema = z.object({
 });
 
 export const createReceivePaymentSchema = z.object({
-  invoice_id: z.string().describe('Invoice ID to apply payment to'),
+  transaction_id: z.number().int().positive().describe('The invoice transaction ID to apply payment to (numeric ID from the invoice)'),
   transaction_date: z.string().describe('Payment date in YYYY-MM-DD format'),
   amount: z.number().positive().describe('Payment amount'),
-  payment_account_id: z.number().int().positive().describe('ID of the bank/cash account that received the payment (required by Jurnal.id)'),
+  deposit_to_name: z.string().describe('Name of the bank/cash account to deposit to (e.g. "BCA 4748"). Use get_accounts to find the account name.'),
+  payment_method_id: z.number().int().positive().describe('Payment method ID (e.g. Transfer Bank). Use get_payment_methods to find the correct ID.'),
+  payment_method_name: z.string().optional().describe('Payment method name (optional, e.g. "Transfer Bank")'),
   custom_id: z.string().optional().describe('Custom payment reference ID (optional)'),
   memo: z.string().optional().describe('Payment memo/note (optional)'),
+  is_draft: z.boolean().default(false).describe('Whether to save as draft (default: false)'),
 });
 
 interface PaymentItem {
@@ -64,12 +67,15 @@ export async function createReceivePayment(params: z.infer<typeof createReceiveP
   const body: Record<string, unknown> = {
     receive_payment: {
       transaction_date: params.transaction_date,
-      payment_account_id: params.payment_account_id,
+      deposit_to_name: params.deposit_to_name,
+      payment_method_id: params.payment_method_id,
+      is_draft: params.is_draft,
+      ...(params.payment_method_name ? { payment_method_name: params.payment_method_name } : {}),
       ...(params.custom_id ? { custom_id: params.custom_id } : {}),
       ...(params.memo ? { memo: params.memo } : {}),
-      payment_lines_attributes: [
+      records_attributes: [
         {
-          invoice_id: params.invoice_id,
+          transaction_id: params.transaction_id,
           amount: params.amount,
         },
       ],

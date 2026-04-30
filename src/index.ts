@@ -59,7 +59,25 @@ import {
   getAccounts,
 } from './tools/accounts.js';
 
-const VERSION = '1.2.0';
+import {
+  getPaymentMethodsSchema,
+  getPaymentMethods,
+} from './tools/payment-methods.js';
+
+import {
+  listExpensesSchema,
+  getExpenseSchema,
+  createExpenseSchema,
+  updateExpenseSchema,
+  deleteExpenseSchema,
+  listExpenses,
+  getExpense,
+  createExpense,
+  updateExpense,
+  deleteExpense,
+} from './tools/expenses.js';
+
+const VERSION = '1.3.0';
 const PORT = parseInt(process.env.MCP_PORT ?? '3000', 10);
 
 function zodToJsonSchema(schema: z.ZodObject<z.ZodRawShape>): Record<string, unknown> {
@@ -189,6 +207,36 @@ function createMcpServer(): Server {
         description: 'List chart of accounts from Jurnal.id. Useful for finding account IDs including bank and cash accounts.',
         inputSchema: zodToJsonSchema(getAccountsSchema),
       },
+      {
+        name: 'get_payment_methods',
+        description: 'List available payment methods from Jurnal.id (e.g. Transfer Bank, Cash). Use this to find the payment_method_id needed for create_receive_payment.',
+        inputSchema: zodToJsonSchema(getPaymentMethodsSchema),
+      },
+      {
+        name: 'list_expenses',
+        description: 'List expenses from Jurnal.id with optional date range filtering',
+        inputSchema: zodToJsonSchema(listExpensesSchema),
+      },
+      {
+        name: 'get_expense',
+        description: 'Get full details of a specific expense including line items',
+        inputSchema: zodToJsonSchema(getExpenseSchema),
+      },
+      {
+        name: 'create_expense',
+        description: 'Create a new expense entry with line items. Requires a payment_account_id (bank/cash account) and expense_lines_attributes with account_id for each expense category.',
+        inputSchema: zodToJsonSchema(createExpenseSchema),
+      },
+      {
+        name: 'update_expense',
+        description: 'Update an existing expense entry',
+        inputSchema: zodToJsonSchema(updateExpenseSchema),
+      },
+      {
+        name: 'delete_expense',
+        description: 'Delete an expense entry by ID',
+        inputSchema: zodToJsonSchema(deleteExpenseSchema),
+      },
     ],
   }));
 
@@ -237,6 +285,24 @@ function createMcpServer(): Server {
           break;
         case 'get_accounts':
           result = await getAccounts(getAccountsSchema.parse(args));
+          break;
+        case 'get_payment_methods':
+          result = await getPaymentMethods(getPaymentMethodsSchema.parse(args));
+          break;
+        case 'list_expenses':
+          result = await listExpenses(listExpensesSchema.parse(args));
+          break;
+        case 'get_expense':
+          result = await getExpense(getExpenseSchema.parse(args));
+          break;
+        case 'create_expense':
+          result = await createExpense(createExpenseSchema.parse(args));
+          break;
+        case 'update_expense':
+          result = await updateExpense(updateExpenseSchema.parse(args));
+          break;
+        case 'delete_expense':
+          result = await deleteExpense(deleteExpenseSchema.parse(args));
           break;
         default:
           return {
