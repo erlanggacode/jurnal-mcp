@@ -16,7 +16,7 @@ export const getExpenseSchema = z.object({
 
 export const createExpenseSchema = z.object({
   transaction_date: z.string().describe('Expense date (YYYY-MM-DD)'),
-  payment_account_id: z.number().int().positive().describe('ID of the bank/cash account used to pay. Use get_accounts to find the correct ID.'),
+  refund_from_id: z.number().int().positive().describe('ID of the bank/cash account used to pay (refund_from_id). Use get_accounts to find the correct ID.'),
   payment_method_id: z.number().int().positive().describe('Payment method ID (e.g. Transfer Bank). Use get_payment_methods to find the correct ID.'),
   payment_method_name: z.string().optional().describe('Payment method name (e.g. "Transfer Bank"). Use get_payment_methods to find the correct name.'),
   transaction_no: z.string().optional().describe('Expense reference number (optional)'),
@@ -24,15 +24,15 @@ export const createExpenseSchema = z.object({
   tags_string: z.string().optional().describe('Comma-separated list of tags to attach (e.g. "marketing,travel,office")'),
   expense_lines_attributes: z.array(z.object({
     account_id: z.number().int().positive().describe('Expense account ID'),
-    amount: z.number().positive().describe('Amount for this line'),
-    memo: z.string().optional().describe('Line item description'),
-  })).describe('Expense line items. Each item needs account_id (expense account from get_accounts), amount, and optional memo.'),
+    amount: z.number().positive().describe('Amount (debit) for this line'),
+    description: z.string().optional().describe('Line item description'),
+  })).describe('Expense line items. Each item needs account_id (expense account from get_accounts), amount, and optional description.'),
 });
 
 export const updateExpenseSchema = z.object({
   id: z.number().int().positive().describe('Expense ID to update'),
   transaction_date: z.string().optional().describe('Expense date (YYYY-MM-DD)'),
-  payment_account_id: z.number().int().positive().optional().describe('ID of the bank/cash account used to pay'),
+  refund_from_id: z.number().int().positive().optional().describe('ID of the bank/cash account used to pay (refund_from_id). Use get_accounts to find the correct ID.'),
   payment_method_id: z.number().int().positive().optional().describe('Payment method ID. Use get_payment_methods to find the correct ID.'),
   payment_method_name: z.string().optional().describe('Payment method name (e.g. "Transfer Bank")'),
   transaction_no: z.string().optional().describe('Expense reference number'),
@@ -41,8 +41,8 @@ export const updateExpenseSchema = z.object({
   expense_lines_attributes: z.array(z.object({
     id: z.number().int().optional().describe('Existing line item ID (required when updating an existing line)'),
     account_id: z.number().int().positive().describe('Expense account ID'),
-    amount: z.number().positive().describe('Amount for this line'),
-    memo: z.string().optional().describe('Line item description'),
+    amount: z.number().positive().describe('Amount (debit) for this line'),
+    description: z.string().optional().describe('Line item description'),
     _destroy: z.boolean().optional().describe('Set to true to delete this line item'),
   })).optional().describe('Expense line items to update'),
 });
@@ -141,9 +141,9 @@ export async function getExpense(params: z.infer<typeof getExpenseSchema>) {
 
 export async function createExpense(params: z.infer<typeof createExpenseSchema>) {
   const body = {
-    transaction: {
+    expense: {
       transaction_date: params.transaction_date,
-      payment_account_id: params.payment_account_id,
+      refund_from_id: params.refund_from_id,
       payment_method_id: params.payment_method_id,
       ...(params.payment_method_name ? { payment_method_name: params.payment_method_name } : {}),
       ...(params.transaction_no ? { transaction_no: params.transaction_no } : {}),
@@ -151,8 +151,8 @@ export async function createExpense(params: z.infer<typeof createExpenseSchema>)
       ...(params.tags_string !== undefined ? { tag_list: params.tags_string.split(',').map(t => t.trim()).filter(Boolean) } : {}),
       transaction_account_lines_attributes: params.expense_lines_attributes.map(line => ({
         account_id: line.account_id,
-        amount: line.amount,
-        ...(line.memo ? { description: line.memo } : {}),
+        debit: line.amount,
+        ...(line.description ? { description: line.description } : {}),
       })),
     },
   };
@@ -172,7 +172,7 @@ export async function updateExpense(params: z.infer<typeof updateExpenseSchema>)
   const expenseBody: Record<string, unknown> = {};
 
   if (fields.transaction_date) expenseBody['transaction_date'] = fields.transaction_date;
-  if (fields.payment_account_id) expenseBody['payment_account_id'] = fields.payment_account_id;
+  if (fields.refund_from_id) expenseBody['refund_from_id'] = fields.refund_from_id;
   if (fields.payment_method_id) expenseBody['payment_method_id'] = fields.payment_method_id;
   if (fields.payment_method_name) expenseBody['payment_method_name'] = fields.payment_method_name;
   if (fields.transaction_no) expenseBody['transaction_no'] = fields.transaction_no;
@@ -182,13 +182,13 @@ export async function updateExpense(params: z.infer<typeof updateExpenseSchema>)
     expenseBody['transaction_account_lines_attributes'] = fields.expense_lines_attributes.map(line => ({
       ...(line.id ? { id: line.id } : {}),
       account_id: line.account_id,
-      amount: line.amount,
-      ...(line.memo ? { description: line.memo } : {}),
+      debit: line.amount,
+      ...(line.description ? { description: line.description } : {}),
       ...(line._destroy ? { _destroy: true } : {}),
     }));
   }
 
-  const data = await jurnalRequest<ExpensesResponse>('PUT', `/api/v1/expenses/${id}`, undefined, { transaction: expenseBody });
+  const data = await jurnalRequest<ExpensesResponse>('PUT', `/api/v1/expenses/${id}`, undefined, { expense: expenseBody });
   const expense = data.expense ?? data as unknown as Expense;
   return {
     id: expense.id,
