@@ -56,6 +56,15 @@ export async function jurnalRequest<T = unknown>(
     fetchOptions.body = JSON.stringify(body);
   }
 
+  const isWrite = ['POST', 'PUT', 'PATCH', 'DELETE'].includes(method.toUpperCase());
+  if (isWrite) {
+    console.error(`[jurnal-mcp] ${method.toUpperCase()} ${url}`);
+    console.error(`[jurnal-mcp] Headers: ${JSON.stringify(requestHeaders)}`);
+    if (body !== undefined) {
+      console.error(`[jurnal-mcp] Body: ${JSON.stringify(body)}`);
+    }
+  }
+
   const response = await fetch(url, fetchOptions);
 
   if (!response.ok) {
@@ -68,6 +77,7 @@ export async function jurnalRequest<T = unknown>(
     } catch {
       // ignore read error, use default message
     }
+    console.error(`[jurnal-mcp] Error response: ${errorMessage}`);
     throw new Error(errorMessage);
   }
 

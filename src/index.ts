@@ -27,7 +27,11 @@ import {
 
 import {
   listSalesInvoicesSchema,
+  createInvoiceSchema,
+  createInvoiceBySalesOrderSchema,
   listSalesInvoices,
+  createInvoice,
+  createInvoiceBySalesOrder,
 } from './tools/invoices.js';
 
 import {
@@ -77,7 +81,7 @@ import {
   deleteExpense,
 } from './tools/expenses.js';
 
-const VERSION = '1.4.2';
+const VERSION = '1.5.0';
 const PORT = parseInt(process.env.MCP_PORT ?? '3000', 10);
 
 function zodToJsonSchema(schema: z.ZodObject<z.ZodRawShape>): Record<string, unknown> {
@@ -173,6 +177,16 @@ function createMcpServer(): Server {
         inputSchema: zodToJsonSchema(listSalesInvoicesSchema),
       },
       {
+        name: 'create_invoice',
+        description: 'Create a new sales invoice with line items',
+        inputSchema: zodToJsonSchema(createInvoiceSchema),
+      },
+      {
+        name: 'create_invoice_by_sales_order',
+        description: 'Create a sales invoice from an existing sales order',
+        inputSchema: zodToJsonSchema(createInvoiceBySalesOrderSchema),
+      },
+      {
         name: 'list_receive_payments',
         description: 'List received payments from Jurnal.id',
         inputSchema: zodToJsonSchema(listReceivePaymentsSchema),
@@ -264,6 +278,12 @@ function createMcpServer(): Server {
           break;
         case 'list_sales_invoices':
           result = await listSalesInvoices(listSalesInvoicesSchema.parse(args));
+          break;
+        case 'create_invoice':
+          result = await createInvoice(createInvoiceSchema.parse(args));
+          break;
+        case 'create_invoice_by_sales_order':
+          result = await createInvoiceBySalesOrder(createInvoiceBySalesOrderSchema.parse(args));
           break;
         case 'list_receive_payments':
           result = await listReceivePayments(listReceivePaymentsSchema.parse(args));
