@@ -362,7 +362,7 @@ const httpServer = createServer(async (req: IncomingMessage, res: ServerResponse
 
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, DELETE, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, mcp-session-id');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, mcp-session-id, Authorization');
 
   if (req.method === 'OPTIONS') {
     res.writeHead(204);
@@ -382,6 +382,16 @@ const httpServer = createServer(async (req: IncomingMessage, res: ServerResponse
   }
 
   if (url.pathname === '/mcp') {
+    const apiKey = process.env.MCP_API_KEY;
+    if (apiKey) {
+      const auth = req.headers['authorization'];
+      if (auth !== `Bearer ${apiKey}`) {
+        res.writeHead(401, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'Unauthorized' }));
+        return;
+      }
+    }
+
     const sessionId = req.headers['mcp-session-id'] as string | undefined;
 
     if (req.method === 'POST') {
