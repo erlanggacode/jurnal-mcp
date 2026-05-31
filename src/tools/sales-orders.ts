@@ -53,7 +53,15 @@ export async function listSalesOrders(params: z.infer<typeof listSalesOrdersSche
     sort_order: params.sort_order,
   });
 
-  return data;
+  const orders = data.sales_orders ?? [];
+  return orders.map((order: SalesOrderItem) => ({
+    id: order.id,
+    number: order.transaction_no,
+    customer_name: order.person?.name,
+    date: order.transaction_date,
+    total: order.amount,
+    status: order.status,
+  }));
 }
 
 export async function getSalesOrder(params: z.infer<typeof getSalesOrderSchema>) {
