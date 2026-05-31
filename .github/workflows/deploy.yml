@@ -46,6 +46,7 @@ jobs:
               -p 0.0.0.0:3000:3000 \
               -e JURNAL_CLIENT_ID="${{ secrets.JURNAL_CLIENT_ID }}" \
               -e JURNAL_CLIENT_SECRET="${{ secrets.JURNAL_CLIENT_SECRET }}" \
+              -e MCP_API_KEY="${{ secrets.MCP_API_KEY }}" \
               -e MCP_PORT="3000" \
               ${{ secrets.DOCKER_USERNAME }}/jurnal-mcp:latest
 
