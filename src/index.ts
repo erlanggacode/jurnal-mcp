@@ -81,6 +81,28 @@ import {
   deleteExpense,
 } from './tools/expenses.js';
 
+import {
+  listPurchaseOrdersSchema,
+  getPurchaseOrderSchema,
+  closePurchaseOrderSchema,
+  createPurchaseOrderSchema,
+  listPurchaseOrders,
+  getPurchaseOrder,
+  closePurchaseOrder,
+  createPurchaseOrder,
+} from './tools/purchase-orders.js';
+
+import {
+  listBillsSchema,
+  getBillSchema,
+  createBillSchema,
+  createBillByPurchaseOrderSchema,
+  listBills,
+  getBill,
+  createBill,
+  createBillByPurchaseOrder,
+} from './tools/bills.js';
+
 const VERSION = '1.5.0';
 const PORT = parseInt(process.env.MCP_PORT ?? '3000', 10);
 
@@ -251,6 +273,46 @@ function createMcpServer(): Server {
         description: 'Delete an expense entry by ID',
         inputSchema: zodToJsonSchema(deleteExpenseSchema),
       },
+      {
+        name: 'list_purchase_orders',
+        description: 'List purchase orders from Jurnal.id with optional filtering by status',
+        inputSchema: zodToJsonSchema(listPurchaseOrdersSchema),
+      },
+      {
+        name: 'get_purchase_order',
+        description: 'Get full details of a specific purchase order including line items',
+        inputSchema: zodToJsonSchema(getPurchaseOrderSchema),
+      },
+      {
+        name: 'close_purchase_order',
+        description: 'Close an open purchase order',
+        inputSchema: zodToJsonSchema(closePurchaseOrderSchema),
+      },
+      {
+        name: 'create_purchase_order',
+        description: 'Create a new purchase order with line items',
+        inputSchema: zodToJsonSchema(createPurchaseOrderSchema),
+      },
+      {
+        name: 'list_bills',
+        description: 'List bills (purchase invoices) from Jurnal.id',
+        inputSchema: zodToJsonSchema(listBillsSchema),
+      },
+      {
+        name: 'get_bill',
+        description: 'Get full details of a specific bill (purchase invoice)',
+        inputSchema: zodToJsonSchema(getBillSchema),
+      },
+      {
+        name: 'create_bill',
+        description: 'Create a new bill (purchase invoice) with line items',
+        inputSchema: zodToJsonSchema(createBillSchema),
+      },
+      {
+        name: 'create_bill_by_purchase_order',
+        description: 'Create a bill (purchase invoice) from an existing purchase order',
+        inputSchema: zodToJsonSchema(createBillByPurchaseOrderSchema),
+      },
     ],
   }));
 
@@ -323,6 +385,30 @@ function createMcpServer(): Server {
           break;
         case 'delete_expense':
           result = await deleteExpense(deleteExpenseSchema.parse(args));
+          break;
+        case 'list_purchase_orders':
+          result = await listPurchaseOrders(listPurchaseOrdersSchema.parse(args));
+          break;
+        case 'get_purchase_order':
+          result = await getPurchaseOrder(getPurchaseOrderSchema.parse(args));
+          break;
+        case 'close_purchase_order':
+          result = await closePurchaseOrder(closePurchaseOrderSchema.parse(args));
+          break;
+        case 'create_purchase_order':
+          result = await createPurchaseOrder(createPurchaseOrderSchema.parse(args));
+          break;
+        case 'list_bills':
+          result = await listBills(listBillsSchema.parse(args));
+          break;
+        case 'get_bill':
+          result = await getBill(getBillSchema.parse(args));
+          break;
+        case 'create_bill':
+          result = await createBill(createBillSchema.parse(args));
+          break;
+        case 'create_bill_by_purchase_order':
+          result = await createBillByPurchaseOrder(createBillByPurchaseOrderSchema.parse(args));
           break;
         default:
           return {
