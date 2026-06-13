@@ -103,7 +103,20 @@ import {
   createBillByPurchaseOrder,
 } from './tools/bills.js';
 
-const VERSION = '1.5.0';
+import {
+  listContactsSchema,
+  getContactSchema,
+  createContactSchema,
+  updateContactSchema,
+  deleteContactSchema,
+  listContacts,
+  getContact,
+  createContact,
+  updateContact,
+  deleteContact,
+} from './tools/contacts.js';
+
+const VERSION = '1.6.0';
 const PORT = parseInt(process.env.MCP_PORT ?? '3000', 10);
 
 function zodToJsonSchema(schema: z.ZodObject<z.ZodRawShape>): Record<string, unknown> {
@@ -313,6 +326,31 @@ function createMcpServer(): Server {
         description: 'Create a bill (purchase invoice) from an existing purchase order',
         inputSchema: zodToJsonSchema(createBillByPurchaseOrderSchema),
       },
+      {
+        name: 'list_contacts',
+        description: 'List contacts (customers and/or vendors) from Jurnal.id with optional filtering by type or name',
+        inputSchema: zodToJsonSchema(listContactsSchema),
+      },
+      {
+        name: 'get_contact',
+        description: 'Get full details of a specific contact by ID',
+        inputSchema: zodToJsonSchema(getContactSchema),
+      },
+      {
+        name: 'create_contact',
+        description: 'Create a new contact (customer, vendor, or both) in Jurnal.id',
+        inputSchema: zodToJsonSchema(createContactSchema),
+      },
+      {
+        name: 'update_contact',
+        description: 'Update an existing contact in Jurnal.id',
+        inputSchema: zodToJsonSchema(updateContactSchema),
+      },
+      {
+        name: 'delete_contact',
+        description: 'Delete a contact from Jurnal.id by ID',
+        inputSchema: zodToJsonSchema(deleteContactSchema),
+      },
     ],
   }));
 
@@ -409,6 +447,21 @@ function createMcpServer(): Server {
           break;
         case 'create_bill_by_purchase_order':
           result = await createBillByPurchaseOrder(createBillByPurchaseOrderSchema.parse(args));
+          break;
+        case 'list_contacts':
+          result = await listContacts(listContactsSchema.parse(args));
+          break;
+        case 'get_contact':
+          result = await getContact(getContactSchema.parse(args));
+          break;
+        case 'create_contact':
+          result = await createContact(createContactSchema.parse(args));
+          break;
+        case 'update_contact':
+          result = await updateContact(updateContactSchema.parse(args));
+          break;
+        case 'delete_contact':
+          result = await deleteContact(deleteContactSchema.parse(args));
           break;
         default:
           return {
