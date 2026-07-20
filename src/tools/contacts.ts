@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { jurnalRequest } from '../jurnal-client.js';
+import { numericId } from '../schema-utils.js';
 
 export const listContactsSchema = z.object({
   page: z.number().int().positive().default(1).describe('Page number'),
@@ -11,7 +12,7 @@ export const listContactsSchema = z.object({
 });
 
 export const getContactSchema = z.object({
-  id: z.number().int().positive().describe('Contact ID'),
+  id: numericId.describe('Contact ID'),
 });
 
 export const createContactSchema = z.object({
@@ -31,7 +32,7 @@ export const createContactSchema = z.object({
 });
 
 export const updateContactSchema = z.object({
-  id: z.number().int().positive().describe('Contact ID to update'),
+  id: numericId.describe('Contact ID to update'),
   display_name: z.string().optional().describe('Contact display name'),
   contact_type: z.enum(['Customer', 'Vendor', 'Both']).optional().describe('Contact type: Customer, Vendor, or Both'),
   email: z.string().optional().describe('Contact email address'),
@@ -48,7 +49,7 @@ export const updateContactSchema = z.object({
 });
 
 export const deleteContactSchema = z.object({
-  id: z.number().int().positive().describe('Contact ID to delete'),
+  id: numericId.describe('Contact ID to delete'),
 });
 
 interface Contact {

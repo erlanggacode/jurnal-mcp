@@ -1,8 +1,9 @@
 import { z } from 'zod';
 import { jurnalRequest } from '../jurnal-client.js';
+import { stringId } from '../schema-utils.js';
 
 export const createDeliveryOrderSchema = z.object({
-  sales_order_id: z.string().describe('Sales order ID to create delivery for'),
+  sales_order_id: stringId.describe('Sales order ID to create delivery for'),
   transaction_date: z.string().describe('Delivery date in YYYY-MM-DD format'),
   memo: z.string().optional().describe('Optional memo/note'),
 });
