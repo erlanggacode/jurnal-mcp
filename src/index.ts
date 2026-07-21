@@ -139,8 +139,24 @@ function zodToJsonSchema(schema: z.ZodObject<z.ZodRawShape>): Record<string, unk
       innerSchema = innerSchema.removeDefault();
     }
 
+    // Coercing helpers (see schema-utils.ts) wrap their input in a transform and
+    // a pipe; unwrap those so the advertised type is the one callers may send.
+    while (innerSchema instanceof z.ZodPipeline || innerSchema instanceof z.ZodEffects) {
+      innerSchema = innerSchema instanceof z.ZodPipeline
+        ? innerSchema._def.in
+        : innerSchema._def.schema;
+    }
+
     if (innerSchema instanceof z.ZodString) {
       prop['type'] = 'string';
+    } else if (innerSchema instanceof z.ZodUnion) {
+      const options = innerSchema.options as z.ZodTypeAny[];
+      const types = [...new Set(options.map(option => {
+        if (option instanceof z.ZodNumber) return 'number';
+        if (option instanceof z.ZodBoolean) return 'boolean';
+        return 'string';
+      }))];
+      prop['type'] = types.length === 1 ? types[0] : types;
     } else if (innerSchema instanceof z.ZodNumber) {
       prop['type'] = 'number';
     } else if (innerSchema instanceof z.ZodBoolean) {

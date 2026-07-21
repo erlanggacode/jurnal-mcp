@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { jurnalRequest } from '../jurnal-client.js';
+import { stringId, numericId, positiveNumber } from '../schema-utils.js';
 
 export const listReceivePaymentsSchema = z.object({
   page: z.number().int().positive().default(1).describe('Page number'),
@@ -9,15 +10,15 @@ export const listReceivePaymentsSchema = z.object({
 });
 
 export const getReceivePaymentsByInvoiceSchema = z.object({
-  invoice_id: z.string().describe('Invoice ID to fetch payments for'),
+  invoice_id: stringId.describe('Invoice ID to fetch payments for'),
 });
 
 export const createReceivePaymentSchema = z.object({
-  transaction_id: z.number().int().positive().describe('The invoice transaction ID to apply payment to (numeric ID from the invoice)'),
+  transaction_id: numericId.describe('The invoice transaction ID to apply payment to (numeric ID from the invoice)'),
   transaction_date: z.string().describe('Payment date in YYYY-MM-DD format'),
-  amount: z.number().positive().describe('Payment amount'),
+  amount: positiveNumber.describe('Payment amount'),
   deposit_to_name: z.string().describe('Name of the bank/cash account to deposit to (e.g. "BCA 4748"). Use get_accounts to find the account name.'),
-  payment_method_id: z.number().int().positive().describe('Payment method ID (e.g. Transfer Bank). Use get_payment_methods to find the correct ID.'),
+  payment_method_id: numericId.describe('Payment method ID (e.g. Transfer Bank). Use get_payment_methods to find the correct ID.'),
   payment_method_name: z.string().optional().describe('Payment method name (optional, e.g. "Transfer Bank")'),
   custom_id: z.string().optional().describe('Custom payment reference ID (optional)'),
   memo: z.string().optional().describe('Payment memo/note (optional)'),

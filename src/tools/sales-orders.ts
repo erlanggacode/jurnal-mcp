@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { jurnalRequest } from '../jurnal-client.js';
+import { stringId, positiveNumber, nonNegativeNumber } from '../schema-utils.js';
 
 export const listSalesOrdersSchema = z.object({
   status: z.enum(['open', 'closed', 'all']).default('open').describe('Filter by order status'),
@@ -10,20 +11,20 @@ export const listSalesOrdersSchema = z.object({
 });
 
 export const getSalesOrderSchema = z.object({
-  id: z.string().describe('Sales order ID'),
+  id: stringId.describe('Sales order ID'),
 });
 
 export const closeSalesOrderSchema = z.object({
-  id: z.string().describe('Sales order ID to close'),
+  id: stringId.describe('Sales order ID to close'),
 });
 
 export const createSalesOrderSchema = z.object({
-  customer_id: z.string().describe('Customer ID'),
+  customer_id: stringId.describe('Customer ID'),
   transaction_date: z.string().describe('Transaction date in YYYY-MM-DD format'),
   line_items: z.array(z.object({
-    product_id: z.string().describe('Product ID'),
-    quantity: z.number().positive().describe('Quantity'),
-    unit_price: z.number().nonnegative().describe('Unit price'),
+    product_id: stringId.describe('Product ID'),
+    quantity: positiveNumber.describe('Quantity'),
+    unit_price: nonNegativeNumber.describe('Unit price'),
   })).describe('Line items for the order'),
   memo: z.string().optional().describe('Optional memo/note'),
 });

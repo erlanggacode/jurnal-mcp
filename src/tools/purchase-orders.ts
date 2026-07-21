@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { jurnalRequest } from '../jurnal-client.js';
+import { stringId, positiveNumber, nonNegativeNumber } from '../schema-utils.js';
 
 export const listPurchaseOrdersSchema = z.object({
   status: z.enum(['open', 'closed', 'all']).default('open').describe('Filter by order status'),
@@ -10,21 +11,21 @@ export const listPurchaseOrdersSchema = z.object({
 });
 
 export const getPurchaseOrderSchema = z.object({
-  id: z.string().describe('Purchase order ID'),
+  id: stringId.describe('Purchase order ID'),
 });
 
 export const closePurchaseOrderSchema = z.object({
-  id: z.string().describe('Purchase order ID to close'),
+  id: stringId.describe('Purchase order ID to close'),
 });
 
 export const createPurchaseOrderSchema = z.object({
-  vendor_id: z.string().describe('Vendor/Supplier ID (use list_customers with type vendor to find)'),
+  vendor_id: stringId.describe('Vendor/Supplier ID (use list_customers with type vendor to find)'),
   transaction_date: z.string().describe('Transaction date in YYYY-MM-DD format'),
   due_date: z.string().optional().describe('Due date in YYYY-MM-DD format'),
   line_items: z.array(z.object({
-    product_id: z.string().describe('Product ID'),
-    quantity: z.number().positive().describe('Quantity'),
-    unit_price: z.number().nonnegative().describe('Unit price'),
+    product_id: stringId.describe('Product ID'),
+    quantity: positiveNumber.describe('Quantity'),
+    unit_price: nonNegativeNumber.describe('Unit price'),
   })).describe('Line items for the purchase order'),
   memo: z.string().optional().describe('Optional memo/note'),
 });

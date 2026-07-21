@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { jurnalRequest } from '../jurnal-client.js';
+import { stringId, positiveNumber, nonNegativeNumber } from '../schema-utils.js';
 
 export const listSalesInvoicesSchema = z.object({
   page: z.number().int().positive().default(1).describe('Page number'),
@@ -9,20 +10,20 @@ export const listSalesInvoicesSchema = z.object({
 });
 
 export const createInvoiceSchema = z.object({
-  customer_id: z.string().describe('Customer ID'),
+  customer_id: stringId.describe('Customer ID'),
   transaction_date: z.string().describe('Invoice date in YYYY-MM-DD format'),
   due_date: z.string().optional().describe('Due date in YYYY-MM-DD format'),
   line_items: z.array(z.object({
-    product_id: z.string().describe('Product ID'),
-    quantity: z.number().positive().describe('Quantity'),
-    unit_price: z.number().nonnegative().describe('Unit price per item'),
+    product_id: stringId.describe('Product ID'),
+    quantity: positiveNumber.describe('Quantity'),
+    unit_price: nonNegativeNumber.describe('Unit price per item'),
     description: z.string().optional().describe('Line item description'),
   })).describe('Line items for the invoice'),
   memo: z.string().optional().describe('Optional memo/note'),
 });
 
 export const createInvoiceBySalesOrderSchema = z.object({
-  sales_order_id: z.string().describe('Sales order ID to create invoice from'),
+  sales_order_id: stringId.describe('Sales order ID to create invoice from'),
   transaction_date: z.string().describe('Invoice date in YYYY-MM-DD format'),
   due_date: z.string().optional().describe('Due date in YYYY-MM-DD format'),
   memo: z.string().optional().describe('Optional memo/note'),

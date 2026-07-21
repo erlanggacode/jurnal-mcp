@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { jurnalRequest } from '../jurnal-client.js';
+import { stringId, positiveNumber, nonNegativeNumber } from '../schema-utils.js';
 
 export const listBillsSchema = z.object({
   page: z.number().int().positive().default(1).describe('Page number'),
@@ -9,24 +10,24 @@ export const listBillsSchema = z.object({
 });
 
 export const getBillSchema = z.object({
-  id: z.string().describe('Bill (purchase invoice) ID'),
+  id: stringId.describe('Bill (purchase invoice) ID'),
 });
 
 export const createBillSchema = z.object({
-  vendor_id: z.string().describe('Vendor/Supplier ID (use list_customers with type vendor to find)'),
+  vendor_id: stringId.describe('Vendor/Supplier ID (use list_customers with type vendor to find)'),
   transaction_date: z.string().describe('Bill date in YYYY-MM-DD format'),
   due_date: z.string().optional().describe('Due date in YYYY-MM-DD format'),
   line_items: z.array(z.object({
-    product_id: z.string().describe('Product ID'),
-    quantity: z.number().positive().describe('Quantity'),
-    unit_price: z.number().nonnegative().describe('Unit price per item'),
+    product_id: stringId.describe('Product ID'),
+    quantity: positiveNumber.describe('Quantity'),
+    unit_price: nonNegativeNumber.describe('Unit price per item'),
     description: z.string().optional().describe('Line item description'),
   })).describe('Line items for the bill'),
   memo: z.string().optional().describe('Optional memo/note'),
 });
 
 export const createBillByPurchaseOrderSchema = z.object({
-  purchase_order_id: z.string().describe('Purchase order ID to create the bill from'),
+  purchase_order_id: stringId.describe('Purchase order ID to create the bill from'),
   transaction_date: z.string().describe('Bill date in YYYY-MM-DD format'),
   due_date: z.string().optional().describe('Due date in YYYY-MM-DD format'),
   memo: z.string().optional().describe('Optional memo/note'),

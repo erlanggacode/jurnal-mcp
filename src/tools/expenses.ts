@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { jurnalRequest } from '../jurnal-client.js';
+import { numericId, positiveNumber } from '../schema-utils.js';
 
 export const listExpensesSchema = z.object({
   page: z.number().int().positive().default(1).describe('Page number'),
@@ -11,44 +12,44 @@ export const listExpensesSchema = z.object({
 });
 
 export const getExpenseSchema = z.object({
-  id: z.number().int().positive().describe('Expense ID'),
+  id: numericId.describe('Expense ID'),
 });
 
 export const createExpenseSchema = z.object({
   transaction_date: z.string().describe('Expense date (YYYY-MM-DD)'),
-  refund_from_id: z.number().int().positive().describe('ID of the bank/cash account used to pay (refund_from_id). Use get_accounts to find the correct ID.'),
-  payment_method_id: z.number().int().positive().describe('Payment method ID (e.g. Transfer Bank). Use get_payment_methods to find the correct ID.'),
+  refund_from_id: numericId.describe('ID of the bank/cash account used to pay (refund_from_id). Use get_accounts to find the correct ID.'),
+  payment_method_id: numericId.describe('Payment method ID (e.g. Transfer Bank). Use get_payment_methods to find the correct ID.'),
   payment_method_name: z.string().optional().describe('Payment method name (e.g. "Transfer Bank"). Use get_payment_methods to find the correct name.'),
   transaction_no: z.string().optional().describe('Expense reference number (optional)'),
   memo: z.string().optional().describe('Expense note/description (optional)'),
   tags_string: z.string().optional().describe('Comma-separated list of tags to attach (e.g. "marketing,travel,office")'),
   expense_lines_attributes: z.array(z.object({
-    account_id: z.number().int().positive().describe('Expense account ID'),
-    amount: z.number().positive().describe('Amount (debit) for this line'),
+    account_id: numericId.describe('Expense account ID'),
+    amount: positiveNumber.describe('Amount (debit) for this line'),
     description: z.string().optional().describe('Line item description'),
   })).describe('Expense line items. Each item needs account_id (expense account from get_accounts), amount, and optional description.'),
 });
 
 export const updateExpenseSchema = z.object({
-  id: z.number().int().positive().describe('Expense ID to update'),
+  id: numericId.describe('Expense ID to update'),
   transaction_date: z.string().optional().describe('Expense date (YYYY-MM-DD)'),
-  refund_from_id: z.number().int().positive().optional().describe('ID of the bank/cash account used to pay (refund_from_id). Use get_accounts to find the correct ID.'),
-  payment_method_id: z.number().int().positive().optional().describe('Payment method ID. Use get_payment_methods to find the correct ID.'),
+  refund_from_id: numericId.optional().describe('ID of the bank/cash account used to pay (refund_from_id). Use get_accounts to find the correct ID.'),
+  payment_method_id: numericId.optional().describe('Payment method ID. Use get_payment_methods to find the correct ID.'),
   payment_method_name: z.string().optional().describe('Payment method name (e.g. "Transfer Bank")'),
   transaction_no: z.string().optional().describe('Expense reference number'),
   memo: z.string().optional().describe('Expense note/description'),
   tags_string: z.string().optional().describe('Comma-separated list of tags (e.g. "marketing,travel"). Replaces all existing tags. Pass empty string to remove all tags.'),
   expense_lines_attributes: z.array(z.object({
-    id: z.number().int().optional().describe('Existing line item ID (required when updating an existing line)'),
-    account_id: z.number().int().positive().describe('Expense account ID'),
-    amount: z.number().positive().describe('Amount (debit) for this line'),
+    id: numericId.optional().describe('Existing line item ID (required when updating an existing line)'),
+    account_id: numericId.describe('Expense account ID'),
+    amount: positiveNumber.describe('Amount (debit) for this line'),
     description: z.string().optional().describe('Line item description'),
     _destroy: z.boolean().optional().describe('Set to true to delete this line item'),
   })).optional().describe('Expense line items to update'),
 });
 
 export const deleteExpenseSchema = z.object({
-  id: z.number().int().positive().describe('Expense ID to delete'),
+  id: numericId.describe('Expense ID to delete'),
 });
 
 interface ExpenseLine {
