@@ -115,6 +115,14 @@ import {
   updateContact,
   deleteContact,
 } from './tools/contacts.js';
+import {
+  searchProductsSchema,
+  listProductsSchema,
+  getProductSchema,
+  searchProducts,
+  listProducts,
+  getProduct,
+} from './tools/products.js';
 
 const VERSION = '1.6.0';
 const PORT = parseInt(process.env.MCP_PORT ?? '3000', 10);
@@ -268,6 +276,25 @@ function createMcpServer(): Server {
         inputSchema: zodToJsonSchema(listCustomersSchema),
       },
       {
+        name: 'search_products',
+        description:
+          'Find a product by name fragment or product code and get its product_id. Terms may ' +
+          'be given in any order and may be partial: "merbau keruing fjl" matches "Mix Keruing ' +
+          'Merbau FJLB Door Frame". Use this to resolve the product_id needed by ' +
+          'create_sales_order, create_invoice, create_purchase_order and create_bill.',
+        inputSchema: zodToJsonSchema(searchProductsSchema),
+      },
+      {
+        name: 'list_products',
+        description: 'List products from Jurnal.id, one page at a time.',
+        inputSchema: zodToJsonSchema(listProductsSchema),
+      },
+      {
+        name: 'get_product',
+        description: 'Get full details of a specific product by ID.',
+        inputSchema: zodToJsonSchema(getProductSchema),
+      },
+      {
         name: 'get_accounts',
         description: 'List chart of accounts from Jurnal.id. Useful for finding account IDs including bank and cash accounts.',
         inputSchema: zodToJsonSchema(getAccountsSchema),
@@ -418,6 +445,15 @@ function createMcpServer(): Server {
           break;
         case 'list_customers':
           result = await listCustomers(listCustomersSchema.parse(args));
+          break;
+        case 'search_products':
+          result = await searchProducts(searchProductsSchema.parse(args));
+          break;
+        case 'list_products':
+          result = await listProducts(listProductsSchema.parse(args));
+          break;
+        case 'get_product':
+          result = await getProduct(getProductSchema.parse(args));
           break;
         case 'get_accounts':
           result = await getAccounts(getAccountsSchema.parse(args));
