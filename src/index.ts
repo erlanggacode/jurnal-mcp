@@ -8,6 +8,7 @@ import {
   isInitializeRequest,
 } from '@modelcontextprotocol/sdk/types.js';
 import { z } from 'zod';
+import { zodToJsonSchema } from './json-schema.js';
 
 import {
   listSalesOrdersSchema,
@@ -126,76 +127,6 @@ import {
 
 const VERSION = '1.6.0';
 const PORT = parseInt(process.env.MCP_PORT ?? '3000', 10);
-
-function zodToJsonSchema(schema: z.ZodObject<z.ZodRawShape>): Record<string, unknown> {
-  const shape = schema.shape;
-  const properties: Record<string, unknown> = {};
-  const required: string[] = [];
-
-  for (const [key, value] of Object.entries(shape)) {
-    const fieldSchema = value as z.ZodTypeAny;
-    const prop: Record<string, unknown> = {};
-
-    let innerSchema = fieldSchema;
-    let isOptional = false;
-
-    if (innerSchema instanceof z.ZodOptional) {
-      isOptional = true;
-      innerSchema = innerSchema.unwrap();
-    } else if (innerSchema instanceof z.ZodDefault) {
-      isOptional = true;
-      innerSchema = innerSchema.removeDefault();
-    }
-
-    // Coercing helpers (see schema-utils.ts) wrap their input in a transform and
-    // a pipe; unwrap those so the advertised type is the one callers may send.
-    while (innerSchema instanceof z.ZodPipeline || innerSchema instanceof z.ZodEffects) {
-      innerSchema = innerSchema instanceof z.ZodPipeline
-        ? innerSchema._def.in
-        : innerSchema._def.schema;
-    }
-
-    if (innerSchema instanceof z.ZodString) {
-      prop['type'] = 'string';
-    } else if (innerSchema instanceof z.ZodUnion) {
-      const options = innerSchema.options as z.ZodTypeAny[];
-      const types = [...new Set(options.map(option => {
-        if (option instanceof z.ZodNumber) return 'number';
-        if (option instanceof z.ZodBoolean) return 'boolean';
-        return 'string';
-      }))];
-      prop['type'] = types.length === 1 ? types[0] : types;
-    } else if (innerSchema instanceof z.ZodNumber) {
-      prop['type'] = 'number';
-    } else if (innerSchema instanceof z.ZodBoolean) {
-      prop['type'] = 'boolean';
-    } else if (innerSchema instanceof z.ZodEnum) {
-      prop['type'] = 'string';
-      prop['enum'] = innerSchema.options;
-    } else if (innerSchema instanceof z.ZodArray) {
-      prop['type'] = 'array';
-      prop['items'] = { type: 'object' };
-    } else {
-      prop['type'] = 'string';
-    }
-
-    const description = (fieldSchema as { description?: string }).description;
-    if (description) {
-      prop['description'] = description;
-    }
-
-    properties[key] = prop;
-    if (!isOptional) {
-      required.push(key);
-    }
-  }
-
-  return {
-    type: 'object',
-    properties,
-    required: required.length > 0 ? required : undefined,
-  };
-}
 
 function createMcpServer(): Server {
   const server = new Server(
