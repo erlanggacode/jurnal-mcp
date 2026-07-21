@@ -120,9 +120,11 @@ import {
   searchProductsSchema,
   listProductsSchema,
   getProductSchema,
+  updateProductSchema,
   searchProducts,
   listProducts,
   getProduct,
+  updateProduct,
 } from './tools/products.js';
 
 const VERSION = '1.6.0';
@@ -224,6 +226,15 @@ function createMcpServer(): Server {
         name: 'get_product',
         description: 'Get full details of a specific product by ID.',
         inputSchema: zodToJsonSchema(getProductSchema),
+      },
+      {
+        name: 'update_product',
+        description:
+          'Update a product. Use purchasable: true to enable "Saya beli produk ini", which a ' +
+          'product needs before it can be added to a bill or purchase order, and sellable: true ' +
+          'for "Saya jual produk ini". Reads the record back after writing and reports which ' +
+          'fields actually changed.',
+        inputSchema: zodToJsonSchema(updateProductSchema),
       },
       {
         name: 'get_accounts',
@@ -385,6 +396,9 @@ function createMcpServer(): Server {
           break;
         case 'get_product':
           result = await getProduct(getProductSchema.parse(args));
+          break;
+        case 'update_product':
+          result = await updateProduct(updateProductSchema.parse(args));
           break;
         case 'get_accounts':
           result = await getAccounts(getAccountsSchema.parse(args));

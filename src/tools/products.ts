@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { jurnalRequest } from '../jurnal-client.js';
-import { stringId } from '../schema-utils.js';
+import { stringId, nonNegativeNumber } from '../schema-utils.js';
 
 // The API caps products at 10 per page regardless of the page_size asked for, so
 // page length says nothing about whether more pages exist. Paging therefore runs
@@ -207,4 +207,110 @@ export const getProductSchema = z.object({
 export async function getProduct(params: z.infer<typeof getProductSchema>) {
   const data = await jurnalRequest<{ product?: Product }>('GET', `/api/v1/products/${params.id}`);
   return data.product ?? data;
+}
+
+export const updateProductSchema = z.object({
+  id: stringId.describe('Product ID. Use search_products to resolve one by name.'),
+  purchasable: z.boolean().optional().describe(
+    'Whether the product can be bought ("Saya beli produk ini" in the Jurnal UI). ' +
+    'Must be true before the product can be put on a bill or purchase order.'
+  ),
+  sellable: z.boolean().optional().describe(
+    'Whether the product can be sold ("Saya jual produk ini" in the Jurnal UI). ' +
+    'Must be true before the product can be put on an invoice or sales order.'
+  ),
+  name: z.string().min(1).optional().describe('Product name'),
+  product_code: z.string().optional().describe('Product code'),
+  buy_price_per_unit: nonNegativeNumber.optional().describe('Purchase price per unit'),
+  sell_price_per_unit: nonNegativeNumber.optional().describe('Selling price per unit'),
+  archived: z.boolean().optional().describe('Whether the product is archived'),
+}).refine(
+  params => Object.keys(params).some(key => key !== 'id'),
+  { message: 'Provide at least one field to change besides id' }
+);
+
+/**
+ * Candidate API field names for each input, most likely first.
+ *
+ * Jurnal's product payload is not documented publicly and the flags do not appear on
+ * the product summaries embedded in transactions, so the real key is resolved against
+ * the live record rather than assumed — see resolveFieldName.
+ */
+const FIELD_CANDIDATES: Record<string, string[]> = {
+  purchasable: ['is_buy', 'is_purchase', 'buy', 'purchase', 'is_bought'],
+  sellable: ['is_sell', 'is_sale', 'sell', 'sale', 'is_sold'],
+  name: ['name', 'product_name'],
+  product_code: ['product_code', 'code'],
+  buy_price_per_unit: ['buy_price_per_unit'],
+  sell_price_per_unit: ['sell_price_per_unit'],
+  archived: ['archive', 'archived'],
+};
+
+/** Pick the candidate the live record actually carries, so unknown keys are never sent. */
+function resolveFieldName(current: Product, input: string): string | null {
+  const candidates = FIELD_CANDIDATES[input] ?? [input];
+  const present = candidates.find(candidate => candidate in current);
+  return present ?? null;
+}
+
+export async function updateProduct(params: z.infer<typeof updateProductSchema>) {
+  const { id, ...requested } = params;
+
+  const before = await jurnalRequest<{ product?: Product }>('GET', `/api/v1/products/${id}`);
+  const current = (before.product ?? before) as Product;
+
+  const changes: Record<string, unknown> = {};
+  const unsupported: { field: string; tried: string[] }[] = [];
+
+  for (const [input, value] of Object.entries(requested)) {
+    if (value === undefined) continue;
+    const apiField = resolveFieldName(current, input);
+    if (apiField === null) {
+      unsupported.push({ field: input, tried: FIELD_CANDIDATES[input] ?? [input] });
+      continue;
+    }
+    changes[apiField] = value;
+  }
+
+  if (unsupported.length > 0) {
+    const detail = unsupported
+      .map(u => `"${u.field}" (tried ${u.tried.join(', ')})`)
+      .join('; ');
+    throw new Error(
+      `Cannot map ${detail} onto product ${id}. Fields present on the record: ` +
+      `[${Object.keys(current).sort().join(', ')}]. Update the candidate list in products.ts ` +
+      `with the correct field name.`
+    );
+  }
+
+  // Method is not documented either; PATCH first, fall back to PUT if it is rejected.
+  const body = { product: changes };
+  try {
+    await jurnalRequest('PATCH', `/api/v1/products/${id}`, undefined, body);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    if (!/40[45]|method not allowed/i.test(message)) throw error;
+    await jurnalRequest('PUT', `/api/v1/products/${id}`, undefined, body);
+  }
+
+  // Read back rather than trusting the write: an API that ignores unknown or
+  // read-only attributes returns 200 while changing nothing, which would otherwise
+  // report success for an update that did not happen.
+  const after = await jurnalRequest<{ product?: Product }>('GET', `/api/v1/products/${id}`);
+  const updated = (after.product ?? after) as Product;
+
+  const applied: string[] = [];
+  const ignored: { field: string; requested: unknown; actual: unknown }[] = [];
+  for (const [apiField, value] of Object.entries(changes)) {
+    if (updated[apiField] === value) applied.push(apiField);
+    else ignored.push({ field: apiField, requested: value, actual: updated[apiField] });
+  }
+
+  return {
+    id,
+    applied,
+    ignored,
+    verified: ignored.length === 0,
+    product: toResult(updated),
+  };
 }

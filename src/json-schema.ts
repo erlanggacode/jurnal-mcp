@@ -83,7 +83,9 @@ export function zodTypeToJsonSchema(schema: z.ZodTypeAny): Record<string, unknow
   return node;
 }
 
-export function zodToJsonSchema(schema: z.ZodObject<z.ZodRawShape>): Record<string, unknown> {
+// Accepts ZodTypeAny, not just ZodObject: schemas carrying a .refine() are ZodEffects,
+// which zodTypeToJsonSchema unwraps to the object underneath.
+export function zodToJsonSchema(schema: z.ZodTypeAny): Record<string, unknown> {
   const root = zodTypeToJsonSchema(schema);
   return {
     type: 'object',
