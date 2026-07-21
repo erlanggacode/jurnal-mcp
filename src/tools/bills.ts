@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { jurnalRequest } from '../jurnal-client.js';
-import { stringId, positiveNumber, nonNegativeNumber } from '../schema-utils.js';
+import { stringId, numericId, positiveNumber, nonNegativeNumber } from '../schema-utils.js';
 
 export const listBillsSchema = z.object({
   page: z.number().int().positive().default(1).describe('Page number'),
@@ -18,11 +18,17 @@ export const createBillSchema = z.object({
   transaction_date: z.string().describe('Bill date in YYYY-MM-DD format'),
   due_date: z.string().optional().describe('Due date in YYYY-MM-DD format'),
   line_items: z.array(z.object({
-    product_id: stringId.describe('Product ID'),
+    product_id: stringId.describe('Product ID. Use search_products to resolve one by name.'),
     quantity: positiveNumber.describe('Quantity'),
-    unit_price: nonNegativeNumber.describe('Unit price per item'),
+    // Named unit_price, not rate: it is mapped to the API's `rate` field on the way out.
+    unit_price: nonNegativeNumber.describe('Unit price per item (sent to the API as "rate")'),
     description: z.string().optional().describe('Line item description'),
-  })).describe('Line items for the bill'),
+    unit_id: numericId.optional().describe('Unit of measure ID (optional; defaults to the product\'s unit)'),
+    tax_id: numericId.optional().describe('Tax ID to apply to this line (optional)'),
+  })).describe(
+    'Line items for the bill. Each item requires product_id, quantity and unit_price; ' +
+    'description, unit_id and tax_id are optional.'
+  ),
   memo: z.string().optional().describe('Optional memo/note'),
 });
 
@@ -87,6 +93,8 @@ export async function createBill(params: z.infer<typeof createBillSchema>) {
         quantity: item.quantity,
         rate: item.unit_price,
         ...(item.description ? { description: item.description } : {}),
+        ...(item.unit_id !== undefined ? { unit_id: item.unit_id } : {}),
+        ...(item.tax_id !== undefined ? { tax_id: item.tax_id } : {}),
       })),
     },
   };

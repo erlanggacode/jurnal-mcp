@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { jurnalRequest } from '../jurnal-client.js';
 import { stringId, positiveNumber, nonNegativeNumber } from '../schema-utils.js';
+import { extractList } from '../response-utils.js';
 
 export const listSalesOrdersSchema = z.object({
   status: z.enum(['open', 'closed', 'all']).default('open').describe('Filter by order status'),
@@ -54,7 +55,7 @@ export async function listSalesOrders(params: z.infer<typeof listSalesOrdersSche
     sort_order: params.sort_order,
   });
 
-  const orders = data.sales_orders ?? [];
+  const orders = extractList<SalesOrderItem>(data, 'GET /api/v1/sales_orders', ['sales_orders', 'data']);
   return orders.map((order: SalesOrderItem) => ({
     id: order.id,
     number: order.transaction_no,

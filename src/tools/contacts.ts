@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { jurnalRequest } from '../jurnal-client.js';
 import { numericId } from '../schema-utils.js';
+import { extractList } from '../response-utils.js';
 
 export const listContactsSchema = z.object({
   page: z.number().int().positive().default(1).describe('Page number'),
@@ -111,7 +112,7 @@ export async function listContacts(params: z.infer<typeof listContactsSchema>) {
 
   const data = await jurnalRequest<ContactsResponse>('GET', '/api/v1/contacts', queryParams);
 
-  const contacts = data.contacts ?? [];
+  const contacts = extractList<Contact>(data, 'GET /api/v1/contacts', ['contacts', 'persons', 'clients', 'data']);
   return contacts.map(mapContact);
 }
 
