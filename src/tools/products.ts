@@ -2,8 +2,11 @@ import { z } from 'zod';
 import { jurnalRequest } from '../jurnal-client.js';
 import { stringId } from '../schema-utils.js';
 
-const MAX_PAGES = 10;
-const FETCH_PAGE_SIZE = 100;
+// The API caps products at 10 per page regardless of the page_size asked for, so
+// page length says nothing about whether more pages exist. Paging therefore runs
+// until a page comes back empty or repeats, never until a page "underfills".
+const MAX_PAGES = 30;
+const REQUESTED_PAGE_SIZE = 100;
 
 export const searchProductsSchema = z.object({
   query: z.string().min(1).describe(
@@ -114,36 +117,71 @@ export async function listProducts(params: z.infer<typeof listProductsSchema>) {
 }
 
 /**
+ * Walk every page of the catalogue.
+ *
+ * Deliberately does not treat a short page as the last one: the API serves 10 per
+ * page whatever page_size is sent, so a "short" page is the normal case. Stops only
+ * on an empty page, or on a page that adds no new IDs — which covers an API that
+ * clamps an out-of-range page number back to a valid one instead of returning empty.
+ */
+async function collectAllProducts(): Promise<{ products: Product[]; exhausted: boolean; pages: number }> {
+  const seenIds = new Set<string>();
+  const products: Product[] = [];
+  let exhausted = false;
+  let pages = 0;
+
+  for (let page = 1; page <= MAX_PAGES; page++) {
+    const batch = await fetchProductPage(page, REQUESTED_PAGE_SIZE);
+    pages++;
+
+    if (batch.length === 0) {
+      exhausted = true;
+      break;
+    }
+
+    let added = 0;
+    for (const product of batch) {
+      const key = String(product.id);
+      if (seenIds.has(key)) continue;
+      seenIds.add(key);
+      products.push(product);
+      added++;
+    }
+
+    if (added === 0) {
+      exhausted = true;
+      break;
+    }
+  }
+
+  return { products, exhausted, pages };
+}
+
+/**
  * Match client-side rather than passing `query` through as a server-side filter:
  * the API's filter semantics are substring-based at best, which would miss
- * reordered and partial terms. Pages are walked up to MAX_PAGES.
+ * reordered and partial terms.
  */
 export async function searchProducts(params: z.infer<typeof searchProductsSchema>) {
   const queryTokens = tokenise(params.query);
   if (queryTokens.length === 0) {
-    return { query: params.query, match_count: 0, matches: [], truncated: false };
+    return {
+      query: params.query,
+      match_count: 0,
+      scanned_products: 0,
+      pages_scanned: 0,
+      truncated: false,
+      matches: [],
+    };
   }
 
+  const { products, exhausted, pages } = await collectAllProducts();
+
   const scored: { product: Product; score: number }[] = [];
-  let scanned = 0;
-  let pagesFetched = 0;
-  let exhausted = false;
-
-  for (let page = 1; page <= MAX_PAGES; page++) {
-    const products = await fetchProductPage(page, FETCH_PAGE_SIZE);
-    pagesFetched++;
-    scanned += products.length;
-
-    for (const product of products) {
-      if (!params.include_archived && isArchived(product)) continue;
-      const score = scoreProduct(product, queryTokens);
-      if (score !== null) scored.push({ product, score });
-    }
-
-    if (products.length < FETCH_PAGE_SIZE) {
-      exhausted = true;
-      break;
-    }
+  for (const product of products) {
+    if (!params.include_archived && isArchived(product)) continue;
+    const score = scoreProduct(product, queryTokens);
+    if (score !== null) scored.push({ product, score });
   }
 
   scored.sort((a, b) =>
@@ -153,8 +191,10 @@ export async function searchProducts(params: z.infer<typeof searchProductsSchema
   return {
     query: params.query,
     match_count: scored.length,
-    // Not every product was seen, so a missing match may exist beyond the scanned pages.
-    scanned_products: scanned,
+    scanned_products: products.length,
+    pages_scanned: pages,
+    // True only when MAX_PAGES ran out before the catalogue did: a match may exist
+    // beyond what was scanned. Never report a partial scan as complete.
     truncated: !exhausted,
     matches: scored.slice(0, params.limit).map(entry => toResult(entry.product)),
   };
