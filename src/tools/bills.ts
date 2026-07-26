@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { jurnalRequest } from '../jurnal-client.js';
 import { stringId, numericId, positiveNumber, nonNegativeNumber } from '../schema-utils.js';
+import { extractList } from '../response-utils.js';
 
 export const listBillsSchema = z.object({
   page: z.number().int().positive().default(1).describe('Page number'),
@@ -64,7 +65,7 @@ export async function listBills(params: z.infer<typeof listBillsSchema>) {
     sort_order: params.sort_order,
   });
 
-  const bills = data.purchase_invoices ?? [];
+  const bills = extractList<BillItem>(data, 'GET /api/v1/purchase_invoices', ['purchase_invoices', 'data']);
   return bills.map((bill: BillItem) => ({
     id: bill.id,
     number: bill.transaction_no,

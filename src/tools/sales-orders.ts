@@ -48,7 +48,9 @@ interface SalesOrdersResponse {
 
 export async function listSalesOrders(params: z.infer<typeof listSalesOrdersSchema>) {
   const data = await jurnalRequest<SalesOrdersResponse>('GET', '/api/v1/sales_orders', {
-    status: params.status,
+    // Jurnal has no "all" status — passing it matches nothing and returns an empty
+    // list, which reads as "you have no sales orders". Omit the filter instead.
+    ...(params.status === 'all' ? {} : { status: params.status }),
     page: params.page,
     page_size: params.page_size,
     sort_by: params.sort_by,
@@ -82,7 +84,7 @@ export async function createSalesOrder(params: z.infer<typeof createSalesOrderSc
       person_id: params.customer_id,
       transaction_date: params.transaction_date,
       memo: params.memo,
-      sales_order_lines_attributes: params.line_items.map(item => ({
+      transaction_lines_attributes: params.line_items.map(item => ({
         product_id: item.product_id,
         quantity: item.quantity,
         rate: item.unit_price,
