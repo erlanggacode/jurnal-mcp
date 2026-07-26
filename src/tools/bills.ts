@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { jurnalRequest } from '../jurnal-client.js';
 import { stringId, numericId, positiveNumber, nonNegativeNumber } from '../schema-utils.js';
-import { extractList } from '../response-utils.js';
+import { extractList, copyTransactionLines, type SourceLine } from '../response-utils.js';
 
 export const listBillsSchema = z.object({
   page: z.number().int().positive().default(1).describe('Page number'),
@@ -286,25 +286,81 @@ export async function deleteBill(params: z.infer<typeof deleteBillSchema>) {
   };
 }
 
+/** Reads the order and copies its vendor and lines onto the bill — see copyTransactionLines. */
 export async function createBillByPurchaseOrder(params: z.infer<typeof createBillByPurchaseOrderSchema>) {
+  const poData = await jurnalRequest<Record<string, unknown>>('GET', `/api/v1/purchase_orders/${params.purchase_order_id}`);
+  const po = (poData.purchase_order ?? poData) as Record<string, unknown>;
+
+  const personId = (po.person as { id?: number | string } | undefined)?.id;
+  const poLines = (po.transaction_lines_attributes as SourceLine[] | undefined) ?? [];
+
+  if (!personId) {
+    throw new Error(
+      `Purchase order ${params.purchase_order_id} has no vendor to copy onto the bill. ` +
+      `Check the order in Jurnal — a bill cannot be created without one.`
+    );
+  }
+  if (poLines.length === 0) {
+    throw new Error(
+      `Purchase order ${params.purchase_order_id} has no line items to copy onto the bill. ` +
+      `If this order was created before the transaction_lines_attributes fix, it is empty in ` +
+      `Jurnal and needs its lines added before it can be billed.`
+    );
+  }
+
+  const lines = copyTransactionLines(poLines);
+
+  if (lines.length === 0) {
+    throw new Error(
+      `Nothing left to bill on purchase order ${params.purchase_order_id}: every line has a ` +
+      `remaining quantity of 0, so it has already been billed in full.`
+    );
+  }
+
   const body = {
     purchase_invoice: {
+      person_id: personId,
+      // Jurnal exposes the link as `selected_po_id` on the bill it returns; send both that
+      // and the conventional name, then check below which one actually took.
       purchase_order_id: params.purchase_order_id,
+      selected_po_id: params.purchase_order_id,
       transaction_date: params.transaction_date,
       ...(params.due_date ? { due_date: params.due_date } : {}),
       ...(params.memo ? { memo: params.memo } : {}),
+      transaction_lines_attributes: lines,
     },
   };
 
   const data = await jurnalRequest<BillsResponse>('POST', '/api/v1/purchase_invoices', undefined, body);
   const bill = data.purchase_invoice as BillItem | undefined ?? data as unknown as BillItem;
+
+  const savedLines = (bill.transaction_lines_attributes as unknown[] | undefined) ?? [];
+  const linkedPoId = bill.selected_po_id ?? (bill.purchase_order as { id?: unknown } | null)?.id;
+  const skipped = poLines.length - lines.length;
+
   return {
     id: bill.id,
     number: bill.transaction_no,
-    vendor_name: bill.person?.name,
+    vendor_name: bill.person?.display_name ?? bill.person?.name,
     date: bill.transaction_date,
     due_date: bill.due_date,
-    total: bill.amount,
+    total: bill.original_amount ?? bill.amount,
     status: bill.status,
+    from_purchase_order: params.purchase_order_id,
+    lines_copied: lines.length,
+    lines_saved: savedLines.length,
+    ...(skipped > 0 ? { lines_skipped_already_billed: skipped } : {}),
+    linked_to_purchase_order: linkedPoId != null,
+    ...(savedLines.length === lines.length ? {} : {
+      warning:
+        `Jurnal saved ${savedLines.length} of the ${lines.length} lines copied from the order. ` +
+        `The bill exists but is incomplete — check it in Jurnal.`,
+    }),
+    ...(linkedPoId != null ? {} : {
+      note:
+        `The bill was created with the right vendor and lines, but Jurnal did not record a link ` +
+        `back to purchase order ${params.purchase_order_id}, so the order will not show as billed. ` +
+        `Close it with close_purchase_order if that is the intent.`,
+    }),
   };
 }

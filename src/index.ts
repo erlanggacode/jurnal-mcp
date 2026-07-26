@@ -181,7 +181,11 @@ function createMcpServer(): Server {
       },
       {
         name: 'create_invoice_by_sales_order',
-        description: 'Create a sales invoice from an existing sales order',
+        description:
+          'Create a sales invoice from an existing sales order. Reads the order and copies its ' +
+          'customer and line items onto the invoice — Jurnal does not do this from the order ' +
+          'reference alone. Invoices the outstanding quantity, so a partly invoiced order is ' +
+          'not billed twice.',
         inputSchema: zodToJsonSchema(createInvoiceBySalesOrderSchema),
       },
       {
@@ -324,7 +328,12 @@ function createMcpServer(): Server {
       },
       {
         name: 'create_bill_by_purchase_order',
-        description: 'Create a bill (purchase invoice) from an existing purchase order',
+        description:
+          'Create a bill (purchase invoice) from an existing purchase order. Reads the order ' +
+          'and copies its vendor and line items onto the bill — Jurnal does not do this from ' +
+          'the order reference alone. Bills the outstanding quantity, so a partly billed order ' +
+          'is not charged twice, and fails rather than creating an empty bill if the order has ' +
+          'no lines.',
         inputSchema: zodToJsonSchema(createBillByPurchaseOrderSchema),
       },
       {

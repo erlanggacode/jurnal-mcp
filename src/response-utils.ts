@@ -11,6 +11,48 @@
  * none of the expected keys raises, naming the keys that were actually present so
  * the real shape can be read off the error.
  */
+export interface SourceLine {
+  quantity?: number | string;
+  remaining_quantity?: number | string;
+  rate?: number | string;
+  description?: string;
+  product?: { id?: number | string; name?: string };
+  unit?: { id?: number | string };
+  tax?: { id?: number | string } | null;
+  line_tax?: { id?: number | string } | null;
+  [key: string]: unknown;
+}
+
+/**
+ * Copy the lines of a source document (purchase order, sales order) into the shape a
+ * create call wants.
+ *
+ * Jurnal does not populate a new transaction from a reference to the document it came
+ * from — passing purchase_order_id or sales_order_id alone is answered with "Person tidak
+ * boleh kosong, Transaction lines tidak boleh kosong". The reference links the records;
+ * the new transaction still has to carry its own vendor/customer and lines.
+ *
+ * Line IDs are deliberately not copied: they belong to the source document's own rows, and
+ * reusing them would point the new record at rows owned by something else. Quantities come
+ * from `remaining_quantity` where the API provides it, so a partly billed or partly invoiced
+ * document bills what is outstanding rather than charging for the same goods twice.
+ */
+export function copyTransactionLines(sourceLines: SourceLine[]): Record<string, unknown>[] {
+  return sourceLines
+    .map(line => {
+      const taxId = line.tax?.id ?? line.line_tax?.id;
+      return {
+        product_id: line.product?.id,
+        quantity: Number(line.remaining_quantity ?? line.quantity ?? 0),
+        rate: Number(line.rate ?? 0),
+        ...(line.description ? { description: line.description } : {}),
+        ...(line.unit?.id !== undefined ? { unit_id: line.unit.id } : {}),
+        ...(taxId !== undefined && taxId !== null ? { tax_id: taxId } : {}),
+      };
+    })
+    .filter(line => line.quantity > 0 && line.product_id !== undefined);
+}
+
 export function extractList<T>(
   data: unknown,
   endpoint: string,
