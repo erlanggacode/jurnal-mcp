@@ -98,10 +98,14 @@ import {
   getBillSchema,
   createBillSchema,
   createBillByPurchaseOrderSchema,
+  updateBillSchema,
+  deleteBillSchema,
   listBills,
   getBill,
   createBill,
   createBillByPurchaseOrder,
+  updateBill,
+  deleteBill,
 } from './tools/bills.js';
 
 import {
@@ -312,6 +316,24 @@ function createMcpServer(): Server {
         inputSchema: zodToJsonSchema(createBillByPurchaseOrderSchema),
       },
       {
+        name: 'update_bill',
+        description:
+          'Update an existing bill (purchase invoice): vendor, dates, memo, and line items. ' +
+          'Line changes are partial — omitted lines are left alone, a line sent with an id is ' +
+          'changed, a line sent without one is added, and _destroy with an id removes it. Call ' +
+          'get_bill first to read existing line IDs. Reads the bill back and reports which ' +
+          'fields Jurnal actually applied.',
+        inputSchema: zodToJsonSchema(updateBillSchema),
+      },
+      {
+        name: 'delete_bill',
+        description:
+          'Permanently delete a bill (purchase invoice). There is no undo. Refuses when Jurnal ' +
+          'marks the bill as not deletable (paid, reconciled, or in a closed period) and returns ' +
+          'a summary of what was deleted.',
+        inputSchema: zodToJsonSchema(deleteBillSchema),
+      },
+      {
         name: 'list_contacts',
         description: 'List contacts (customers and/or vendors) from Jurnal.id with optional filtering by type or name',
         inputSchema: zodToJsonSchema(listContactsSchema),
@@ -441,6 +463,12 @@ function createMcpServer(): Server {
           break;
         case 'create_bill':
           result = await createBill(createBillSchema.parse(args));
+          break;
+        case 'update_bill':
+          result = await updateBill(updateBillSchema.parse(args));
+          break;
+        case 'delete_bill':
+          result = await deleteBill(deleteBillSchema.parse(args));
           break;
         case 'create_bill_by_purchase_order':
           result = await createBillByPurchaseOrder(createBillByPurchaseOrderSchema.parse(args));
