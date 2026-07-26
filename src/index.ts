@@ -39,9 +39,11 @@ import {
   listReceivePaymentsSchema,
   getReceivePaymentsByInvoiceSchema,
   createReceivePaymentSchema,
+  createBillPaymentSchema,
   listReceivePayments,
   getReceivePaymentsByInvoice,
   createReceivePayment,
+  createBillPayment,
 } from './tools/payments.js';
 
 import {
@@ -191,6 +193,16 @@ function createMcpServer(): Server {
         name: 'get_receive_payments_by_invoice',
         description: 'Get all payments for a specific invoice with total paid amount',
         inputSchema: zodToJsonSchema(getReceivePaymentsByInvoiceSchema),
+      },
+      {
+        name: 'create_bill_payment',
+        description:
+          'Pay a bill (purchase invoice): records money leaving a bank/cash account and ' +
+          'applies it against the bill, clearing the payable. This is the payable-side ' +
+          'mirror of create_receive_payment. Do NOT use create_expense to pay a bill — that ' +
+          'records a separate expense and leaves the bill outstanding. Verifies the payment ' +
+          "by checking the bill's remaining balance actually moved.",
+        inputSchema: zodToJsonSchema(createBillPaymentSchema),
       },
       {
         name: 'create_receive_payment',
@@ -400,6 +412,9 @@ function createMcpServer(): Server {
           break;
         case 'create_receive_payment':
           result = await createReceivePayment(createReceivePaymentSchema.parse(args));
+          break;
+        case 'create_bill_payment':
+          result = await createBillPayment(createBillPaymentSchema.parse(args));
           break;
         case 'get_bank_accounts':
           result = await getBankAccounts(getBankAccountsSchema.parse(args));
