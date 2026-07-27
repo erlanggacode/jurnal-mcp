@@ -176,7 +176,11 @@ function createMcpServer(): Server {
       },
       {
         name: 'create_invoice',
-        description: 'Create a new sales invoice with line items',
+        description:
+          'Create a new sales invoice with line items, optionally with an invoice-level ' +
+          'discount (percent or flat amount), per-line discounts and taxes, and withholding ' +
+          'tax (PPh, which needs withholding_account_id). Reads the invoice back and reports ' +
+          'the discount and withholding Jurnal actually applied.',
         inputSchema: zodToJsonSchema(createInvoiceSchema),
       },
       {
