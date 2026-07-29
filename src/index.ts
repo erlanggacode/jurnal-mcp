@@ -28,11 +28,17 @@ import {
 
 import {
   listSalesInvoicesSchema,
+  getInvoiceSchema,
   createInvoiceSchema,
   createInvoiceBySalesOrderSchema,
+  updateInvoiceSchema,
+  deleteInvoiceSchema,
   listSalesInvoices,
+  getInvoice,
   createInvoice,
   createInvoiceBySalesOrder,
+  updateInvoice,
+  deleteInvoice,
 } from './tools/invoices.js';
 
 import {
@@ -179,6 +185,11 @@ function createMcpServer(): Server {
         inputSchema: zodToJsonSchema(listSalesInvoicesSchema),
       },
       {
+        name: 'get_invoice',
+        description: 'Get full details of a specific sales invoice including line items',
+        inputSchema: zodToJsonSchema(getInvoiceSchema),
+      },
+      {
         name: 'create_invoice',
         description:
           'Create a new sales invoice with line items, optionally with an invoice-level ' +
@@ -195,6 +206,24 @@ function createMcpServer(): Server {
           'reference alone. Invoices the outstanding quantity, so a partly invoiced order is ' +
           'not billed twice.',
         inputSchema: zodToJsonSchema(createInvoiceBySalesOrderSchema),
+      },
+      {
+        name: 'update_invoice',
+        description:
+          'Update an existing sales invoice: customer, dates, memo, discount, withholding tax ' +
+          '(PPh), and line items. Line changes are partial — omitted lines are left alone, a ' +
+          'line sent with an id is changed, a line sent without one is added, and _destroy with ' +
+          'an id removes it. Call get_invoice first to read existing line IDs. Reads the invoice ' +
+          'back and reports which fields Jurnal actually applied.',
+        inputSchema: zodToJsonSchema(updateInvoiceSchema),
+      },
+      {
+        name: 'delete_invoice',
+        description:
+          'Permanently delete a sales invoice. There is no undo. Refuses when Jurnal marks the ' +
+          'invoice as not deletable (paid, reconciled, or in a closed period) and returns a ' +
+          'summary of what was deleted.',
+        inputSchema: zodToJsonSchema(deleteInvoiceSchema),
       },
       {
         name: 'list_receive_payments',
@@ -432,11 +461,20 @@ function createMcpServer(): Server {
         case 'list_sales_invoices':
           result = await listSalesInvoices(listSalesInvoicesSchema.parse(args));
           break;
+        case 'get_invoice':
+          result = await getInvoice(getInvoiceSchema.parse(args));
+          break;
         case 'create_invoice':
           result = await createInvoice(createInvoiceSchema.parse(args));
           break;
         case 'create_invoice_by_sales_order':
           result = await createInvoiceBySalesOrder(createInvoiceBySalesOrderSchema.parse(args));
+          break;
+        case 'update_invoice':
+          result = await updateInvoice(updateInvoiceSchema.parse(args));
+          break;
+        case 'delete_invoice':
+          result = await deleteInvoice(deleteInvoiceSchema.parse(args));
           break;
         case 'list_receive_payments':
           result = await listReceivePayments(listReceivePaymentsSchema.parse(args));
