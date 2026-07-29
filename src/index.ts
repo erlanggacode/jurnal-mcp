@@ -53,7 +53,11 @@ import {
 
 import {
   listJournalEntriesSchema,
+  getJournalEntrySchema,
+  createJournalEntrySchema,
   listJournalEntries,
+  getJournalEntry,
+  createJournalEntry,
 } from './tools/journal-entries.js';
 
 import {
@@ -133,7 +137,7 @@ import {
   updateProduct,
 } from './tools/products.js';
 
-const VERSION = '1.6.0';
+const VERSION = '1.7.0';
 const PORT = parseInt(process.env.MCP_PORT ?? '3000', 10);
 
 function createMcpServer(): Server {
@@ -224,8 +228,25 @@ function createMcpServer(): Server {
       },
       {
         name: 'list_journal_entries',
-        description: 'List general journal entries from Jurnal.id with optional date range filtering',
+        description: 'List general journal entries from Jurnal.id with optional date range filtering, including the debit/credit lines of each entry',
         inputSchema: zodToJsonSchema(listJournalEntriesSchema),
+      },
+      {
+        name: 'get_journal_entry',
+        description: 'Get one general journal entry with its full debit/credit lines, account names and totals',
+        inputSchema: zodToJsonSchema(getJournalEntrySchema),
+      },
+      {
+        name: 'create_journal_entry',
+        description:
+          'Post a general journal entry: a balanced set of debit and credit lines against the ' +
+          'chart of accounts. Use this for bookkeeping that is not a sale, purchase or payment — ' +
+          'owner drawings (prive), opening balances, accruals, depreciation, reclassifying a ' +
+          'down payment. Each line takes one account (account_id from get_accounts, or an exact ' +
+          'account_name) and either a debit or a credit; total debit must equal total credit. ' +
+          'Rejects an unbalanced entry before sending, then reads the entry back and reports ' +
+          'whether the lines and totals Jurnal saved match what was sent.',
+        inputSchema: zodToJsonSchema(createJournalEntrySchema),
       },
       {
         name: 'list_customers',
@@ -434,6 +455,12 @@ function createMcpServer(): Server {
           break;
         case 'list_journal_entries':
           result = await listJournalEntries(listJournalEntriesSchema.parse(args));
+          break;
+        case 'get_journal_entry':
+          result = await getJournalEntry(getJournalEntrySchema.parse(args));
+          break;
+        case 'create_journal_entry':
+          result = await createJournalEntry(createJournalEntrySchema.parse(args));
           break;
         case 'list_customers':
           result = await listCustomers(listCustomersSchema.parse(args));
