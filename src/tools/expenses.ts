@@ -189,7 +189,18 @@ export async function updateExpense(params: z.infer<typeof updateExpenseSchema>)
     }));
   }
 
-  const data = await jurnalRequest<ExpensesResponse>('PUT', `/api/v1/expenses/${id}`, undefined, { expense: expenseBody });
+  // Method is not documented; PATCH first, fall back to PUT if it is rejected — same
+  // resilience bills, invoices, orders and journal entries already have. This tool used to
+  // send PUT only, which Jurnal answers with 405 on the expenses endpoint.
+  const body = { expense: expenseBody };
+  let data: ExpensesResponse;
+  try {
+    data = await jurnalRequest<ExpensesResponse>('PATCH', `/api/v1/expenses/${id}`, undefined, body);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    if (!/40[45]|method not allowed/i.test(message)) throw error;
+    data = await jurnalRequest<ExpensesResponse>('PUT', `/api/v1/expenses/${id}`, undefined, body);
+  }
   const expense = data.expense ?? data as unknown as Expense;
   return {
     id: expense.id,
