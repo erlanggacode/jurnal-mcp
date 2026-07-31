@@ -15,10 +15,14 @@ import {
   getSalesOrderSchema,
   closeSalesOrderSchema,
   createSalesOrderSchema,
+  updateSalesOrderSchema,
+  deleteSalesOrderSchema,
   listSalesOrders,
   getSalesOrder,
   closeSalesOrder,
   createSalesOrder,
+  updateSalesOrder,
+  deleteSalesOrder,
 } from './tools/sales-orders.js';
 
 import {
@@ -61,9 +65,13 @@ import {
   listJournalEntriesSchema,
   getJournalEntrySchema,
   createJournalEntrySchema,
+  updateJournalEntrySchema,
+  deleteJournalEntrySchema,
   listJournalEntries,
   getJournalEntry,
   createJournalEntry,
+  updateJournalEntry,
+  deleteJournalEntry,
 } from './tools/journal-entries.js';
 
 import {
@@ -99,10 +107,14 @@ import {
   getPurchaseOrderSchema,
   closePurchaseOrderSchema,
   createPurchaseOrderSchema,
+  updatePurchaseOrderSchema,
+  deletePurchaseOrderSchema,
   listPurchaseOrders,
   getPurchaseOrder,
   closePurchaseOrder,
   createPurchaseOrder,
+  updatePurchaseOrder,
+  deletePurchaseOrder,
 } from './tools/purchase-orders.js';
 
 import {
@@ -173,6 +185,24 @@ function createMcpServer(): Server {
         name: 'create_sales_order',
         description: 'Create a new sales order with line items',
         inputSchema: zodToJsonSchema(createSalesOrderSchema),
+      },
+      {
+        name: 'update_sales_order',
+        description:
+          'Update an existing sales order: customer, date, memo, and line items. Line changes ' +
+          'are partial — omitted lines are left alone, a line sent with an id is changed, a line ' +
+          'sent without one is added, and _destroy with an id removes it. Call get_sales_order ' +
+          'first to read existing line IDs. Reads the order back and reports which fields Jurnal ' +
+          'actually applied.',
+        inputSchema: zodToJsonSchema(updateSalesOrderSchema),
+      },
+      {
+        name: 'delete_sales_order',
+        description:
+          'Permanently delete a sales order. There is no undo. Refuses when Jurnal marks the ' +
+          'order as not deletable (already invoiced/delivered, or in a closed period) and returns ' +
+          'a summary of what was deleted.',
+        inputSchema: zodToJsonSchema(deleteSalesOrderSchema),
       },
       {
         name: 'create_delivery_order',
@@ -278,6 +308,25 @@ function createMcpServer(): Server {
         inputSchema: zodToJsonSchema(createJournalEntrySchema),
       },
       {
+        name: 'update_journal_entry',
+        description:
+          'Update an existing general journal entry: date, memo, custom_id, tags, and lines. ' +
+          'Line changes are partial — omitted lines are left alone, a line sent with an id is ' +
+          'changed, a line sent without one is added, and _destroy with an id removes it. The ' +
+          'resulting set of lines must still balance debit = credit; this is checked locally ' +
+          'before anything is sent, and again by reading the entry back afterward. Call ' +
+          'get_journal_entry first to read existing line IDs. Refuses when the entry is locked ' +
+          '(closed period) or reconciled.',
+        inputSchema: zodToJsonSchema(updateJournalEntrySchema),
+      },
+      {
+        name: 'delete_journal_entry',
+        description:
+          'Permanently delete a general journal entry. There is no undo. Refuses when the entry ' +
+          'is locked (closed period) or reconciled, and returns a summary of what was deleted.',
+        inputSchema: zodToJsonSchema(deleteJournalEntrySchema),
+      },
+      {
         name: 'list_customers',
         description: 'List customers from Jurnal.id with optional name search',
         inputSchema: zodToJsonSchema(listCustomersSchema),
@@ -364,6 +413,24 @@ function createMcpServer(): Server {
         name: 'create_purchase_order',
         description: 'Create a new purchase order with line items',
         inputSchema: zodToJsonSchema(createPurchaseOrderSchema),
+      },
+      {
+        name: 'update_purchase_order',
+        description:
+          'Update an existing purchase order: vendor, dates, memo, and line items. Line changes ' +
+          'are partial — omitted lines are left alone, a line sent with an id is changed, a line ' +
+          'sent without one is added, and _destroy with an id removes it. Call get_purchase_order ' +
+          'first to read existing line IDs. Reads the order back and reports which fields Jurnal ' +
+          'actually applied.',
+        inputSchema: zodToJsonSchema(updatePurchaseOrderSchema),
+      },
+      {
+        name: 'delete_purchase_order',
+        description:
+          'Permanently delete a purchase order. There is no undo. Refuses when Jurnal marks the ' +
+          'order as not deletable (already billed, or in a closed period) and returns a summary ' +
+          'of what was deleted.',
+        inputSchema: zodToJsonSchema(deletePurchaseOrderSchema),
       },
       {
         name: 'list_bills',
@@ -455,6 +522,12 @@ function createMcpServer(): Server {
         case 'create_sales_order':
           result = await createSalesOrder(createSalesOrderSchema.parse(args));
           break;
+        case 'update_sales_order':
+          result = await updateSalesOrder(updateSalesOrderSchema.parse(args));
+          break;
+        case 'delete_sales_order':
+          result = await deleteSalesOrder(deleteSalesOrderSchema.parse(args));
+          break;
         case 'create_delivery_order':
           result = await createDeliveryOrder(createDeliveryOrderSchema.parse(args));
           break;
@@ -499,6 +572,12 @@ function createMcpServer(): Server {
           break;
         case 'create_journal_entry':
           result = await createJournalEntry(createJournalEntrySchema.parse(args));
+          break;
+        case 'update_journal_entry':
+          result = await updateJournalEntry(updateJournalEntrySchema.parse(args));
+          break;
+        case 'delete_journal_entry':
+          result = await deleteJournalEntry(deleteJournalEntrySchema.parse(args));
           break;
         case 'list_customers':
           result = await listCustomers(listCustomersSchema.parse(args));
@@ -547,6 +626,12 @@ function createMcpServer(): Server {
           break;
         case 'create_purchase_order':
           result = await createPurchaseOrder(createPurchaseOrderSchema.parse(args));
+          break;
+        case 'update_purchase_order':
+          result = await updatePurchaseOrder(updatePurchaseOrderSchema.parse(args));
+          break;
+        case 'delete_purchase_order':
+          result = await deletePurchaseOrder(deletePurchaseOrderSchema.parse(args));
           break;
         case 'list_bills':
           result = await listBills(listBillsSchema.parse(args));
