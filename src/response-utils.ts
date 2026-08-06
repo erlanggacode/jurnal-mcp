@@ -78,9 +78,16 @@ export function extractList<T>(
     const present = Object.keys(record);
     if (present.length === 0) return [];
 
+    const shapes = present.map(k => {
+      const v = record[k];
+      if (Array.isArray(v)) return `${k}: array[${v.length}]`;
+      if (v && typeof v === 'object') return `${k}: object{${Object.keys(v as object).join(', ')}}`;
+      return `${k}: ${typeof v}`;
+    });
+
     throw new Error(
       `Jurnal API response for ${endpoint} contained no array under ${keys.map(k => `"${k}"`).join(' or ')}. ` +
-      `Top-level keys present: [${present.join(', ')}]. ` +
+      `Top-level keys present: [${shapes.join('; ')}]. ` +
       `The endpoint path or response envelope is probably wrong — this is a bug in the MCP server, ` +
       `not an empty result.`
     );
