@@ -112,7 +112,11 @@ export async function listContacts(params: z.infer<typeof listContactsSchema>) {
 
   const data = await jurnalRequest<ContactsResponse>('GET', '/api/v1/contacts', queryParams);
 
-  const contacts = extractList<Contact>(data, 'GET /api/v1/contacts', ['contact_list', 'contacts', 'persons', 'clients', 'data']);
+  // Jurnal wraps the array two levels deep: { contact_list: { contact_data: [...] } }.
+  const contactList = (data as Record<string, unknown>)['contact_list'];
+  const unwrapped = contactList && typeof contactList === 'object' ? contactList : data;
+
+  const contacts = extractList<Contact>(unwrapped, 'GET /api/v1/contacts', ['contact_data', 'contacts', 'persons', 'clients', 'data']);
   return contacts.map(mapContact);
 }
 
