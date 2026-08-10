@@ -22,6 +22,7 @@ export const closeSalesOrderSchema = z.object({
 export const createSalesOrderSchema = z.object({
   customer_id: stringId.describe('Customer ID'),
   transaction_date: z.string().describe('Transaction date in YYYY-MM-DD format'),
+  due_date: z.string().optional().describe('Due date in YYYY-MM-DD format'),
   line_items: z.array(z.object({
     product_id: stringId.describe('Product ID'),
     quantity: positiveNumber.describe('Quantity'),
@@ -34,6 +35,10 @@ export const updateSalesOrderSchema = z.object({
   id: stringId.describe('Sales order ID to update'),
   customer_id: stringId.optional().describe('Change the customer'),
   transaction_date: z.string().optional().describe('Transaction date in YYYY-MM-DD format'),
+  due_date: z.string().optional().describe(
+    'Due date in YYYY-MM-DD format. Jurnal requires this on every update, so when omitted ' +
+    'the order\'s existing due date is resent unchanged.'
+  ),
   memo: z.string().optional().describe('Memo/note. Pass an empty string to clear it.'),
   line_items: z.array(z.object({
     id: numericId.optional().describe(
@@ -59,6 +64,7 @@ interface SalesOrderItem {
   transaction_no?: string;
   person?: { id?: number | string; name?: string };
   transaction_date?: string;
+  due_date?: string;
   amount?: number;
   status?: string;
   editable?: boolean;
@@ -110,6 +116,7 @@ export async function createSalesOrder(params: z.infer<typeof createSalesOrderSc
     sales_order: {
       person_id: params.customer_id,
       transaction_date: params.transaction_date,
+      ...(params.due_date ? { due_date: params.due_date } : {}),
       memo: params.memo,
       transaction_lines_attributes: params.line_items.map(item => ({
         product_id: item.product_id,
@@ -128,10 +135,14 @@ export async function createSalesOrder(params: z.infer<typeof createSalesOrderSc
 }
 
 /** Jurnal accepts dates as YYYY-MM-DD but returns them as DD/MM/YYYY. */
+function toInputDate(returned: string): string {
+  const dmy = returned.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+  return dmy ? `${dmy[3]}-${dmy[2]}-${dmy[1]}` : returned;
+}
+
 function sameDate(sent: string, returned: unknown): boolean {
   if (typeof returned !== 'string') return false;
-  const dmy = returned.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
-  return (dmy ? `${dmy[3]}-${dmy[2]}-${dmy[1]}` : returned) === sent;
+  return toInputDate(returned) === sent;
 }
 
 export async function updateSalesOrder(params: z.infer<typeof updateSalesOrderSchema>) {
@@ -152,6 +163,7 @@ export async function updateSalesOrder(params: z.infer<typeof updateSalesOrderSc
   const changes: Record<string, unknown> = {};
   if (fields.customer_id !== undefined) changes['person_id'] = fields.customer_id;
   if (fields.transaction_date !== undefined) changes['transaction_date'] = fields.transaction_date;
+  if (fields.due_date !== undefined) changes['due_date'] = fields.due_date;
   if (fields.memo !== undefined) changes['memo'] = fields.memo;
   if (line_items !== undefined) {
     changes['transaction_lines_attributes'] = line_items.map(line => ({
@@ -165,6 +177,13 @@ export async function updateSalesOrder(params: z.infer<typeof updateSalesOrderSc
 
   if (Object.keys(changes).length === 0) {
     throw new Error(`No fields given to update on sales order ${id}.`);
+  }
+
+  // Jurnal rejects a sales order PATCH with "due_date tidak boleh kosong" if due_date is
+  // absent from the payload at all, even when nothing about the date is changing. Resend
+  // the existing value so a real change to another field doesn't get blocked by this.
+  if (changes['due_date'] === undefined && current.due_date !== undefined) {
+    changes['due_date'] = toInputDate(current.due_date);
   }
 
   const body = { sales_order: changes };
@@ -208,6 +227,7 @@ export async function updateSalesOrder(params: z.infer<typeof updateSalesOrderSc
     }),
     total: updated.original_amount ?? updated.amount,
     date: updated.transaction_date,
+    due_date: updated.due_date,
     memo: updated.memo,
     status: updated.status,
   };

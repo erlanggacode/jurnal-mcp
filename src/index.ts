@@ -189,11 +189,11 @@ function createMcpServer(): Server {
       {
         name: 'update_sales_order',
         description:
-          'Update an existing sales order: customer, date, memo, and line items. Line changes ' +
-          'are partial — omitted lines are left alone, a line sent with an id is changed, a line ' +
-          'sent without one is added, and _destroy with an id removes it. Call get_sales_order ' +
-          'first to read existing line IDs. Reads the order back and reports which fields Jurnal ' +
-          'actually applied.',
+          'Update an existing sales order: customer, date, due date, memo, and line items. Line ' +
+          'changes are partial — omitted lines are left alone, a line sent with an id is changed, ' +
+          'a line sent without one is added, and _destroy with an id removes it. Call ' +
+          'get_sales_order first to read existing line IDs. Reads the order back and reports ' +
+          'which fields Jurnal actually applied.',
         inputSchema: zodToJsonSchema(updateSalesOrderSchema),
       },
       {
