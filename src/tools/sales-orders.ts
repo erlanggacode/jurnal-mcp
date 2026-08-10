@@ -29,6 +29,9 @@ export const createSalesOrderSchema = z.object({
     unit_price: nonNegativeNumber.describe('Unit price'),
   })).describe('Line items for the order'),
   memo: z.string().optional().describe('Optional memo/note'),
+  message: z.string().optional().describe(
+    'Terms/notes text shown on the printed sales order, separate from memo.'
+  ),
 });
 
 export const updateSalesOrderSchema = z.object({
@@ -40,6 +43,10 @@ export const updateSalesOrderSchema = z.object({
     'the order\'s existing due date is resent unchanged.'
   ),
   memo: z.string().optional().describe('Memo/note. Pass an empty string to clear it.'),
+  message: z.string().optional().describe(
+    'Terms/notes text shown on the printed sales order, separate from memo. Pass an empty ' +
+    'string to clear it.'
+  ),
   line_items: z.array(z.object({
     id: numericId.optional().describe(
       'Existing line ID, from get_sales_order. REQUIRED to change or remove a line — ' +
@@ -65,6 +72,7 @@ interface SalesOrderItem {
   person?: { id?: number | string; name?: string };
   transaction_date?: string;
   due_date?: string;
+  message?: string;
   amount?: number;
   status?: string;
   editable?: boolean;
@@ -118,6 +126,7 @@ export async function createSalesOrder(params: z.infer<typeof createSalesOrderSc
       transaction_date: params.transaction_date,
       ...(params.due_date ? { due_date: params.due_date } : {}),
       memo: params.memo,
+      ...(params.message !== undefined ? { message: params.message } : {}),
       transaction_lines_attributes: params.line_items.map(item => ({
         product_id: item.product_id,
         quantity: item.quantity,
@@ -165,6 +174,7 @@ export async function updateSalesOrder(params: z.infer<typeof updateSalesOrderSc
   if (fields.transaction_date !== undefined) changes['transaction_date'] = fields.transaction_date;
   if (fields.due_date !== undefined) changes['due_date'] = fields.due_date;
   if (fields.memo !== undefined) changes['memo'] = fields.memo;
+  if (fields.message !== undefined) changes['message'] = fields.message;
   if (line_items !== undefined) {
     changes['transaction_lines_attributes'] = line_items.map(line => ({
       ...(line.id !== undefined ? { id: line.id } : {}),
@@ -229,6 +239,7 @@ export async function updateSalesOrder(params: z.infer<typeof updateSalesOrderSc
     date: updated.transaction_date,
     due_date: updated.due_date,
     memo: updated.memo,
+    message: updated.message,
     status: updated.status,
   };
 }
