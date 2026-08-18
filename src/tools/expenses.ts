@@ -56,8 +56,11 @@ interface ExpenseLine {
   id?: number | string;
   account_id?: number | string;
   account_name?: string;
+  account?: { id?: number | string; name?: string };
   amount?: number;
+  debit?: number;
   memo?: string;
+  description?: string;
   [key: string]: unknown;
 }
 
@@ -71,14 +74,14 @@ interface Expense {
   id: number | string;
   transaction_no?: string;
   transaction_date?: string;
-  payment_account_name?: string;
-  payment_account_id?: number | string;
+  pay_from?: { id?: number | string; name?: string };
   memo?: string;
-  amount?: number;
-  status?: string;
+  original_amount?: number;
+  subtotal?: number;
+  transaction_status?: { id?: number | string; name?: string } | string;
   tags?: Tag[];
   tags_string?: string;
-  expense_lines?: ExpenseLine[];
+  transaction_account_lines_attributes?: ExpenseLine[];
   [key: string]: unknown;
 }
 
@@ -86,6 +89,27 @@ interface ExpensesResponse {
   expenses?: Expense[];
   expense?: Expense;
   [key: string]: unknown;
+}
+
+/**
+ * Jurnal returns expense lines under `transaction_account_lines_attributes` — the same key
+ * writes use, unlike journal entries which normalize to `transaction_account_lines` on read.
+ * This tool used to read `expense_lines`, a key the API never sends, so every expense reported
+ * an empty line list.
+ */
+function mapExpenseLines(expense: Expense) {
+  return (expense.transaction_account_lines_attributes ?? []).map((l: ExpenseLine) => ({
+    id: l.id,
+    account_id: l.account_id ?? l.account?.id,
+    account_name: l.account_name ?? l.account?.name,
+    amount: l.debit ?? l.amount,
+    description: l.description ?? l.memo,
+  }));
+}
+
+function statusName(status: Expense['transaction_status']): string | undefined {
+  if (status && typeof status === 'object') return status.name;
+  return status;
 }
 
 export async function listExpenses(params: z.infer<typeof listExpensesSchema>) {
@@ -106,10 +130,10 @@ export async function listExpenses(params: z.infer<typeof listExpensesSchema>) {
       id: e.id,
       number: e.transaction_no,
       date: e.transaction_date,
-      payment_account: e.payment_account_name,
-      amount: e.amount,
+      payment_account: e.pay_from?.name,
+      amount: e.original_amount ?? e.subtotal,
       memo: e.memo,
-      status: e.status,
+      status: statusName(e.transaction_status),
       tags: (e.tags ?? []).map((t: Tag) => t.name),
     })),
     _raw_keys: data.expenses ? undefined : Object.keys(data),
@@ -123,21 +147,14 @@ export async function getExpense(params: z.infer<typeof getExpenseSchema>) {
     id: expense.id,
     number: expense.transaction_no,
     date: expense.transaction_date,
-    payment_account: expense.payment_account_name,
-    payment_account_id: expense.payment_account_id,
-    amount: expense.amount,
+    payment_account: expense.pay_from?.name,
+    payment_account_id: expense.pay_from?.id,
+    amount: expense.original_amount ?? expense.subtotal,
     memo: expense.memo,
-    status: expense.status,
+    status: statusName(expense.transaction_status),
     tags: (expense.tags ?? []).map((t: Tag) => t.name),
     tags_string: expense.tags_string,
-    lines: (expense.expense_lines ?? []).map((l: ExpenseLine) => ({
-      id: l.id,
-      account_id: l.account_id,
-      account_name: l.account_name,
-      amount: l.amount,
-      memo: l.memo,
-    })),
-    _debug_raw: expense,
+    lines: mapExpenseLines(expense),
   };
 }
 
@@ -165,7 +182,7 @@ export async function createExpense(params: z.infer<typeof createExpenseSchema>)
     id: expense.id,
     number: expense.transaction_no,
     date: expense.transaction_date,
-    amount: expense.amount,
+    amount: expense.original_amount ?? expense.subtotal,
   };
 }
 
@@ -207,7 +224,7 @@ export async function updateExpense(params: z.infer<typeof updateExpenseSchema>)
     id: expense.id,
     number: expense.transaction_no,
     date: expense.transaction_date,
-    amount: expense.amount,
+    amount: expense.original_amount ?? expense.subtotal,
   };
 }
 

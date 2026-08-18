@@ -9,6 +9,17 @@ import {
 } from '@modelcontextprotocol/sdk/types.js';
 import { z } from 'zod';
 import { zodToJsonSchema } from './json-schema.js';
+import {
+  isOAuthPath,
+  baseUrl,
+  protectedResourceMetadata,
+  authorizationServerMetadata,
+  registerClient,
+  authorizeGet,
+  authorizePost,
+  token as issueOrRefreshToken,
+  validateAccessToken,
+} from './oauth.js';
 
 import {
   listSalesOrdersSchema,
@@ -155,7 +166,7 @@ import {
   updateProduct,
 } from './tools/products.js';
 
-const VERSION = '1.7.0';
+const VERSION = '1.8.0';
 const PORT = parseInt(process.env.MCP_PORT ?? '3000', 10);
 
 function createMcpServer(): Server {
@@ -713,6 +724,36 @@ const httpServer = createServer(async (req: IncomingMessage, res: ServerResponse
     return;
   }
 
+  if (isOAuthPath(url.pathname)) {
+    if (url.pathname === '/.well-known/oauth-protected-resource' && req.method === 'GET') {
+      protectedResourceMetadata(req, res);
+      return;
+    }
+    if (url.pathname === '/.well-known/oauth-authorization-server' && req.method === 'GET') {
+      authorizationServerMetadata(req, res);
+      return;
+    }
+    if (url.pathname === '/register' && req.method === 'POST') {
+      registerClient(res, await readBody(req));
+      return;
+    }
+    if (url.pathname === '/authorize' && req.method === 'GET') {
+      authorizeGet(res, url.searchParams);
+      return;
+    }
+    if (url.pathname === '/authorize' && req.method === 'POST') {
+      authorizePost(res, await readBody(req));
+      return;
+    }
+    if (url.pathname === '/token' && req.method === 'POST') {
+      issueOrRefreshToken(res, await readBody(req));
+      return;
+    }
+    res.writeHead(404, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ error: 'Not found' }));
+    return;
+  }
+
   if (url.pathname === '/health') {
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({
@@ -728,8 +769,15 @@ const httpServer = createServer(async (req: IncomingMessage, res: ServerResponse
     const apiKey = process.env.MCP_API_KEY;
     if (apiKey) {
       const auth = req.headers['authorization'];
-      if (auth !== `Bearer ${apiKey}`) {
-        res.writeHead(401, { 'Content-Type': 'application/json' });
+      const bearerToken = auth?.startsWith('Bearer ') ? auth.slice(7) : undefined;
+      const staticKeyOk = auth === `Bearer ${apiKey}`;
+      const oauthTokenOk = bearerToken !== undefined && validateAccessToken(bearerToken);
+      if (!staticKeyOk && !oauthTokenOk) {
+        const resourceMetadataUrl = `${baseUrl(req)}/.well-known/oauth-protected-resource`;
+        res.writeHead(401, {
+          'Content-Type': 'application/json',
+          'WWW-Authenticate': `Bearer resource_metadata="${resourceMetadataUrl}"`,
+        });
         res.end(JSON.stringify({ error: 'Unauthorized' }));
         return;
       }
