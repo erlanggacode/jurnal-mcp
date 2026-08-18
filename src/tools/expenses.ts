@@ -137,6 +137,7 @@ export async function getExpense(params: z.infer<typeof getExpenseSchema>) {
       amount: l.amount,
       memo: l.memo,
     })),
+    _debug_raw_keys: expense.expense_lines ? undefined : Object.keys(expense),
   };
 }
 
