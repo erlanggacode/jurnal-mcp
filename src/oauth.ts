@@ -52,7 +52,17 @@ function base64url(buf: Buffer): string {
   return buf.toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 }
 
+/**
+ * Reverse proxies in front of this server (Tailscale Funnel included) can rewrite or strip
+ * the port from the Host header before forwarding, so a URL derived from req.headers.host may
+ * not match the URL the user actually entered in Claude. The OAuth spec requires the
+ * protected-resource `resource` field to match that URL exactly, so an explicit
+ * PUBLIC_BASE_URL takes precedence when set; req.headers.host is a best-effort fallback for
+ * setups (e.g. plain LAN access) where no proxy is involved.
+ */
 export function baseUrl(req: IncomingMessage): string {
+  const configured = process.env.PUBLIC_BASE_URL;
+  if (configured) return configured.replace(/\/+$/, '');
   const proto = (req.headers['x-forwarded-proto'] as string) ?? 'https';
   return `${proto}://${req.headers.host}`;
 }

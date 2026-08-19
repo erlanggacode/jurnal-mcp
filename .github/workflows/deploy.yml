@@ -48,6 +48,7 @@ jobs:
               -e JURNAL_CLIENT_SECRET="${{ secrets.JURNAL_CLIENT_SECRET }}" \
               -e MCP_API_KEY="${{ secrets.MCP_API_KEY }}" \
               -e MCP_PORT="3000" \
+              -e PUBLIC_BASE_URL="https://kakashi.tail20fe4f.ts.net:3005" \
               ${{ secrets.DOCKER_USERNAME }}/jurnal-mcp:latest
 
             docker image prune -f
