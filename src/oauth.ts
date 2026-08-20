@@ -39,7 +39,9 @@ const authCodes = new Map<string, AuthCode>();
 const accessTokens = new Map<string, TokenEntry>();
 const refreshTokens = new Map<string, TokenEntry>();
 
-const CODE_TTL_MS = 60_000;
+// Generous window: the real round trip is browser redirect -> claude.ai processing ->
+// claude.ai's backend calling /token, which can take much longer than a scripted exchange.
+const CODE_TTL_MS = 10 * 60_000;
 const ACCESS_TOKEN_TTL_S = 3600;
 
 setInterval(() => {
@@ -262,12 +264,29 @@ export function token(res: ServerResponse, body: string): void {
     const code_verifier = form.get('code_verifier') ?? '';
 
     const entry = authCodes.get(code);
-    if (!entry || entry.expiresAt < Date.now() || entry.client_id !== client_id || entry.redirect_uri !== redirect_uri) {
-      json(res, 400, { error: 'invalid_grant' });
+    if (!entry) {
+      console.error(`[oauth] token exchange: unknown or already-used code (client_id=${client_id})`);
+      json(res, 400, { error: 'invalid_grant', error_description: 'unknown or already-used code' });
+      return;
+    }
+    if (entry.expiresAt < Date.now()) {
+      console.error(`[oauth] token exchange: code expired ${Date.now() - entry.expiresAt}ms ago (client_id=${client_id})`);
+      json(res, 400, { error: 'invalid_grant', error_description: 'code expired' });
+      return;
+    }
+    if (entry.client_id !== client_id) {
+      console.error(`[oauth] token exchange: client_id mismatch — code issued to "${entry.client_id}", request sent "${client_id}"`);
+      json(res, 400, { error: 'invalid_grant', error_description: 'client_id mismatch' });
+      return;
+    }
+    if (entry.redirect_uri !== redirect_uri) {
+      console.error(`[oauth] token exchange: redirect_uri mismatch — code issued for "${entry.redirect_uri}", request sent "${redirect_uri}"`);
+      json(res, 400, { error: 'invalid_grant', error_description: 'redirect_uri mismatch' });
       return;
     }
     const challenge = base64url(createHash('sha256').update(code_verifier).digest());
     if (challenge !== entry.code_challenge) {
+      console.error(`[oauth] token exchange: PKCE mismatch — expected challenge "${entry.code_challenge}", computed "${challenge}" from verifier len=${code_verifier.length}`);
       json(res, 400, { error: 'invalid_grant', error_description: 'PKCE verification failed' });
       return;
     }
