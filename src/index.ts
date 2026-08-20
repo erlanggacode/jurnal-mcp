@@ -725,6 +725,7 @@ const httpServer = createServer(async (req: IncomingMessage, res: ServerResponse
   }
 
   if (isOAuthPath(url.pathname)) {
+    console.error(`[oauth] ${req.method} ${url.pathname} from ${req.socket.remoteAddress} via host=${req.headers.host} xff=${req.headers['x-forwarded-for'] ?? '-'}`);
     if (url.pathname === '/.well-known/oauth-protected-resource' && req.method === 'GET') {
       protectedResourceMetadata(req, res);
       return;

@@ -292,6 +292,7 @@ export function token(res: ServerResponse, body: string): void {
     }
     authCodes.delete(code);
 
+    console.error(`[oauth] token exchange: success (client_id=${client_id})`);
     const { access_token, refresh_token } = issueTokenPair(client_id, entry.scope);
     json(res, 200, {
       access_token,
