@@ -39,6 +39,16 @@ const authCodes = new Map<string, AuthCode>();
 const accessTokens = new Map<string, TokenEntry>();
 const refreshTokens = new Map<string, TokenEntry>();
 
+/**
+ * A fixed client_id for manual configuration (claude.ai's "OAuth Client ID" field), so it
+ * survives redeploys. Dynamically registered clients (via POST /register) still live only in
+ * memory and are lost on restart — that's fine for DCR, which re-registers automatically on
+ * the next connection attempt, but a manually-typed ID has no such retry.
+ */
+const STATIC_CLIENT_ID = 'jurnal-mcp';
+const STATIC_REDIRECT_URIS = ['https://claude.ai/api/mcp/auth_callback'];
+clients.set(STATIC_CLIENT_ID, { client_id: STATIC_CLIENT_ID, redirect_uris: STATIC_REDIRECT_URIS, client_name: 'claude.ai (static)' });
+
 // Generous window: the real round trip is browser redirect -> claude.ai processing ->
 // claude.ai's backend calling /token, which can take much longer than a scripted exchange.
 const CODE_TTL_MS = 10 * 60_000;
