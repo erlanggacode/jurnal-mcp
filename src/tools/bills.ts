@@ -31,6 +31,7 @@ export const createBillSchema = z.object({
     'description, unit_id and tax_id are optional.'
   ),
   memo: z.string().optional().describe('Optional memo/note'),
+  reference_no: z.string().optional().describe('Vendor\'s reference/invoice number ("No Referensi" in the Jurnal UI)'),
 });
 
 export const createBillByPurchaseOrderSchema = z.object({
@@ -46,6 +47,9 @@ export const updateBillSchema = z.object({
   transaction_date: z.string().optional().describe('Bill date in YYYY-MM-DD format'),
   due_date: z.string().optional().describe('Due date in YYYY-MM-DD format'),
   memo: z.string().optional().describe('Memo/note. Pass an empty string to clear it.'),
+  reference_no: z.string().optional().describe(
+    'Vendor\'s reference/invoice number ("No Referensi" in the Jurnal UI). Pass an empty string to clear it.'
+  ),
   line_items: z.array(z.object({
     id: numericId.optional().describe(
       'Existing line ID, from get_bill. REQUIRED to change or remove a line — ' +
@@ -120,6 +124,7 @@ export async function createBill(params: z.infer<typeof createBillSchema>) {
       transaction_date: params.transaction_date,
       ...(params.due_date ? { due_date: params.due_date } : {}),
       ...(params.memo ? { memo: params.memo } : {}),
+      ...(params.reference_no ? { reference_no: params.reference_no } : {}),
       transaction_lines_attributes: params.line_items.map(item => ({
         product_id: item.product_id,
         quantity: item.quantity,
@@ -175,6 +180,7 @@ export async function updateBill(params: z.infer<typeof updateBillSchema>) {
   if (fields.transaction_date !== undefined) changes['transaction_date'] = fields.transaction_date;
   if (fields.due_date !== undefined) changes['due_date'] = fields.due_date;
   if (fields.memo !== undefined) changes['memo'] = fields.memo;
+  if (fields.reference_no !== undefined) changes['reference_no'] = fields.reference_no;
   if (line_items !== undefined) {
     changes['transaction_lines_attributes'] = line_items.map(line => ({
       ...(line.id !== undefined ? { id: line.id } : {}),
@@ -236,6 +242,7 @@ export async function updateBill(params: z.infer<typeof updateBillSchema>) {
     date: updated.transaction_date,
     due_date: updated.due_date,
     memo: updated.memo,
+    reference_no: updated.reference_no,
   };
 }
 
