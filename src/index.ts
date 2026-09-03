@@ -172,10 +172,12 @@ import {
   searchProductsSchema,
   listProductsSchema,
   getProductSchema,
+  createProductSchema,
   updateProductSchema,
   searchProducts,
   listProducts,
   getProduct,
+  createProduct,
   updateProduct,
 } from './tools/products.js';
 
@@ -374,6 +376,11 @@ function createMcpServer(): Server {
         name: 'get_product',
         description: 'Get full details of a specific product by ID.',
         inputSchema: zodToJsonSchema(getProductSchema),
+      },
+      {
+        name: 'create_product',
+        description: 'Create a new product. Requires name, unit_name and product_code. Set purchasable/sellable to make it usable on bills/purchase orders or invoices/sales orders.',
+        inputSchema: zodToJsonSchema(createProductSchema),
       },
       {
         name: 'update_product',
@@ -640,6 +647,9 @@ function createMcpServer(): Server {
           break;
         case 'get_product':
           result = await getProduct(getProductSchema.parse(args));
+          break;
+        case 'create_product':
+          result = await createProduct(createProductSchema.parse(args));
           break;
         case 'update_product':
           result = await updateProduct(updateProductSchema.parse(args));

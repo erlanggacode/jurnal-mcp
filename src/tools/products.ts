@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { jurnalRequest } from '../jurnal-client.js';
-import { stringId, nonNegativeNumber } from '../schema-utils.js';
+import { stringId, nonNegativeNumber, numericId } from '../schema-utils.js';
 
 // The API caps products at 10 per page regardless of the page_size asked for, so
 // page length says nothing about whether more pages exist. Paging therefore runs
@@ -209,6 +209,62 @@ export async function getProduct(params: z.infer<typeof getProductSchema>) {
   return data.product ?? data;
 }
 
+export const createProductSchema = z.object({
+  name: z.string().min(1).describe('Product name'),
+  unit_name: z.string().min(1).describe('Unit of measure name (e.g. "M3", "pcs"). Use get_accounts or the Jurnal UI to see existing units.'),
+  product_code: z.string().min(1).describe('Unique product/SKU code'),
+  description: z.string().optional().describe('Product description'),
+  custom_id: z.string().optional().describe('Custom reference ID (optional)'),
+  purchasable: z.boolean().optional().describe(
+    'Whether the product can be bought ("Saya beli produk ini" in the Jurnal UI). ' +
+    'Must be true before the product can be put on a bill or purchase order.'
+  ),
+  sellable: z.boolean().optional().describe(
+    'Whether the product can be sold ("Saya jual produk ini" in the Jurnal UI). ' +
+    'Must be true before the product can be put on an invoice or sales order.'
+  ),
+  buy_price_per_unit: nonNegativeNumber.optional().describe('Purchase price per unit'),
+  sell_price_per_unit: nonNegativeNumber.optional().describe('Selling price per unit'),
+  taxable_buy: z.boolean().optional().describe('Whether purchases of this product are taxed'),
+  taxable_sell: z.boolean().optional().describe('Whether sales of this product are taxed'),
+  buy_tax_id: numericId.optional().describe('Tax ID applied on purchase (optional)'),
+  sell_tax_id: numericId.optional().describe('Tax ID applied on sale (optional)'),
+  track_inventory: z.boolean().optional().describe('Whether Jurnal tracks stock quantity for this product'),
+  buy_account_name: z.string().optional().describe('Purchase (COGS/expense) account name, e.g. "Cost of Sales"'),
+  sell_account_name: z.string().optional().describe('Sales/revenue account name, e.g. "Service Revenue"'),
+  inventory_asset_account_name: z.string().optional().describe('Inventory asset account name (only relevant when track_inventory is true)'),
+  product_category_ids: z.array(numericId).optional().describe('IDs of product categories to assign'),
+});
+
+export async function createProduct(params: z.infer<typeof createProductSchema>) {
+  const body = {
+    product: {
+      name: params.name,
+      unit_name: params.unit_name,
+      product_code: params.product_code,
+      ...(params.description ? { description: params.description } : {}),
+      ...(params.custom_id ? { custom_id: params.custom_id } : {}),
+      ...(params.purchasable !== undefined ? { is_bought: params.purchasable } : {}),
+      ...(params.sellable !== undefined ? { is_sold: params.sellable } : {}),
+      ...(params.buy_price_per_unit !== undefined ? { buy_price_per_unit: String(params.buy_price_per_unit) } : {}),
+      ...(params.sell_price_per_unit !== undefined ? { sell_price_per_unit: String(params.sell_price_per_unit) } : {}),
+      ...(params.taxable_buy !== undefined ? { taxable_buy: params.taxable_buy } : {}),
+      ...(params.taxable_sell !== undefined ? { taxable_sell: params.taxable_sell } : {}),
+      ...(params.buy_tax_id !== undefined ? { buy_tax_id: params.buy_tax_id } : {}),
+      ...(params.sell_tax_id !== undefined ? { sell_tax_id: params.sell_tax_id } : {}),
+      ...(params.track_inventory !== undefined ? { track_inventory: String(params.track_inventory) } : {}),
+      ...(params.buy_account_name ? { buy_account_name: params.buy_account_name } : {}),
+      ...(params.sell_account_name ? { sell_account_name: params.sell_account_name } : {}),
+      ...(params.inventory_asset_account_name ? { inventory_asset_account_name: params.inventory_asset_account_name } : {}),
+      ...(params.product_category_ids ? { product_category_ids: params.product_category_ids } : {}),
+    },
+  };
+
+  const data = await jurnalRequest<{ product?: Product }>('POST', '/api/v1/products', undefined, body);
+  const product = (data.product ?? data) as Product;
+  return toResult(product);
+}
+
 export const updateProductSchema = z.object({
   id: stringId.describe('Product ID. Use search_products to resolve one by name.'),
   purchasable: z.boolean().optional().describe(
@@ -243,7 +299,6 @@ const FIELD_CANDIDATES: Record<string, string[]> = {
   product_code: ['product_code', 'code'],
   buy_price_per_unit: ['buy_price_per_unit'],
   sell_price_per_unit: ['sell_price_per_unit'],
-  archived: ['archive', 'archived'],
 };
 
 /** Pick the candidate the live record actually carries, so unknown keys are never sent. */
@@ -254,7 +309,7 @@ function resolveFieldName(current: Product, input: string): string | null {
 }
 
 export async function updateProduct(params: z.infer<typeof updateProductSchema>) {
-  const { id, ...requested } = params;
+  const { id, archived, ...requested } = params;
 
   const before = await jurnalRequest<{ product?: Product }>('GET', `/api/v1/products/${id}`);
   const current = (before.product ?? before) as Product;
@@ -283,14 +338,21 @@ export async function updateProduct(params: z.infer<typeof updateProductSchema>)
     );
   }
 
-  // Method is not documented either; PATCH first, fall back to PUT if it is rejected.
-  const body = { product: changes };
-  try {
-    await jurnalRequest('PATCH', `/api/v1/products/${id}`, undefined, body);
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    if (!/40[45]|method not allowed/i.test(message)) throw error;
-    await jurnalRequest('PUT', `/api/v1/products/${id}`, undefined, body);
+  if (Object.keys(changes).length > 0) {
+    // Method is not documented either; PATCH first, fall back to PUT if it is rejected.
+    const body = { product: changes };
+    try {
+      await jurnalRequest('PATCH', `/api/v1/products/${id}`, undefined, body);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      if (!/40[45]|method not allowed/i.test(message)) throw error;
+      await jurnalRequest('PUT', `/api/v1/products/${id}`, undefined, body);
+    }
+  }
+
+  // Archiving is not a PATCH field — Jurnal exposes it as two dedicated actions.
+  if (archived !== undefined) {
+    await jurnalRequest('POST', `/api/v1/products/${id}/${archived ? 'deactivate' : 'activate'}`);
   }
 
   // Read back rather than trusting the write: an API that ignores unknown or
@@ -304,6 +366,10 @@ export async function updateProduct(params: z.infer<typeof updateProductSchema>)
   for (const [apiField, value] of Object.entries(changes)) {
     if (updated[apiField] === value) applied.push(apiField);
     else ignored.push({ field: apiField, requested: value, actual: updated[apiField] });
+  }
+  if (archived !== undefined) {
+    if (isArchived(updated) === archived) applied.push('archived');
+    else ignored.push({ field: 'archived', requested: archived, actual: isArchived(updated) });
   }
 
   return {
