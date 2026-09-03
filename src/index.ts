@@ -114,6 +114,19 @@ import {
 } from './tools/expenses.js';
 
 import {
+  listBankWithdrawalsSchema,
+  getBankWithdrawalSchema,
+  createBankWithdrawalSchema,
+  updateBankWithdrawalSchema,
+  deleteBankWithdrawalSchema,
+  listBankWithdrawals,
+  getBankWithdrawal,
+  createBankWithdrawal,
+  updateBankWithdrawal,
+  deleteBankWithdrawal,
+} from './tools/bank-withdrawals.js';
+
+import {
   listPurchaseOrdersSchema,
   getPurchaseOrderSchema,
   closePurchaseOrderSchema,
@@ -407,6 +420,31 @@ function createMcpServer(): Server {
         inputSchema: zodToJsonSchema(deleteExpenseSchema),
       },
       {
+        name: 'list_bank_withdrawals',
+        description: 'List bank withdrawals (cash transfers out) from Jurnal.id with optional date range filtering. A distinct transaction type from expenses.',
+        inputSchema: zodToJsonSchema(listBankWithdrawalsSchema),
+      },
+      {
+        name: 'get_bank_withdrawal',
+        description: 'Get full details of a specific bank withdrawal including line items',
+        inputSchema: zodToJsonSchema(getBankWithdrawalSchema),
+      },
+      {
+        name: 'create_bank_withdrawal',
+        description: 'Create a new bank withdrawal with line items. Requires refund_from_name (the account money leaves) and withdrawal_lines_attributes with account_name for each line.',
+        inputSchema: zodToJsonSchema(createBankWithdrawalSchema),
+      },
+      {
+        name: 'update_bank_withdrawal',
+        description: 'Update an existing bank withdrawal',
+        inputSchema: zodToJsonSchema(updateBankWithdrawalSchema),
+      },
+      {
+        name: 'delete_bank_withdrawal',
+        description: 'Delete a bank withdrawal by ID',
+        inputSchema: zodToJsonSchema(deleteBankWithdrawalSchema),
+      },
+      {
         name: 'list_purchase_orders',
         description: 'List purchase orders from Jurnal.id with optional filtering by status',
         inputSchema: zodToJsonSchema(listPurchaseOrdersSchema),
@@ -626,6 +664,21 @@ function createMcpServer(): Server {
           break;
         case 'delete_expense':
           result = await deleteExpense(deleteExpenseSchema.parse(args));
+          break;
+        case 'list_bank_withdrawals':
+          result = await listBankWithdrawals(listBankWithdrawalsSchema.parse(args));
+          break;
+        case 'get_bank_withdrawal':
+          result = await getBankWithdrawal(getBankWithdrawalSchema.parse(args));
+          break;
+        case 'create_bank_withdrawal':
+          result = await createBankWithdrawal(createBankWithdrawalSchema.parse(args));
+          break;
+        case 'update_bank_withdrawal':
+          result = await updateBankWithdrawal(updateBankWithdrawalSchema.parse(args));
+          break;
+        case 'delete_bank_withdrawal':
+          result = await deleteBankWithdrawal(deleteBankWithdrawalSchema.parse(args));
           break;
         case 'list_purchase_orders':
           result = await listPurchaseOrders(listPurchaseOrdersSchema.parse(args));

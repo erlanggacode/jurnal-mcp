@@ -141,7 +141,23 @@ export async function listExpenses(params: z.infer<typeof listExpensesSchema>) {
 }
 
 export async function getExpense(params: z.infer<typeof getExpenseSchema>) {
-  const data = await jurnalRequest<ExpensesResponse>('GET', `/api/v1/expenses/${params.id}`);
+  let data: ExpensesResponse;
+  try {
+    data = await jurnalRequest<ExpensesResponse>('GET', `/api/v1/expenses/${params.id}`);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    // Records entered through a non-API pathway (e.g. bulk import) show up in list_expenses
+    // with status "Closed", but this detail endpoint 422s on them instead of a plain 404 —
+    // there is no known workaround short of the Jurnal UI.
+    if (/422/.test(message) && /tidak ditemukan/i.test(message)) {
+      throw new Error(
+        `Jurnal returned 422 "Data tidak ditemukan" for expense ${params.id}. This happens for ` +
+        `expenses with status "Closed" (as opposed to "Paid") — likely entered via bulk import ` +
+        `rather than through this API. Check the record in the Jurnal UI instead.`
+      );
+    }
+    throw error;
+  }
   const expense = data.expense ?? data as unknown as Expense;
   return {
     id: expense.id,
